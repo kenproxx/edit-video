@@ -1,0 +1,35 @@
+name: Windows build and tests
+on:
+  push:
+    branches: [main, 'feat/**']
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  windows:
+    runs-on: windows-2022
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build without preinstalled Python or FFmpeg
+        shell: powershell
+        run: |
+          $env:PATH = "$env:SystemRoot\System32;$env:SystemRoot;$env:SystemRoot\System32\WindowsPowerShell\v1.0"
+          & .\scripts\bootstrap.ps1
+      - name: Upload portable ZIP
+        uses: actions/upload-artifact@v4
+        with:
+          name: EditVideo-windows-x64
+          path: dist/EditVideo-windows-x64.zip
+          if-no-files-found: error
+          retention-days: 30
+      - name: Upload verification results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: Windows-verification
+          path: |
+            .build/test-results.xml
+            dist/EditVideo/self-test.json
+          if-no-files-found: ignore
