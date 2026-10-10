@@ -1,0 +1,16 @@
+[build-system]
+requires = ["setuptools>=70"]
+build-backend = "setuptools.build_meta"
+[project]
+name = "edit-video"
+version = "0.1.0"
+description = "Ứng dụng chỉnh sửa video Windows"
+requires-python = ">=3.11"
+dependencies = ["PySide6==6.8.3"]
+[project.scripts]
+edit-video = "edit_video.__main__:main"
+[tool.setuptools.packages.find]
+where = ["src"]
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+testpaths = ["tests"]

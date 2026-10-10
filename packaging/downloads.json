@@ -1,0 +1,14 @@
+{
+  "python": {
+    "version": "3.12.10",
+    "url": "https://api.nuget.org/v3-flatcontainer/python/3.12.10/python.3.12.10.nupkg",
+    "sha256": "0eb85c2dfccccf1b17352de4c397f69194035b7d37149eacc16f1147d93de3b8",
+    "license_url": "https://docs.python.org/3.12/license.html"
+  },
+  "ffmpeg": {
+    "version": "7.1.1",
+    "url": "https://github.com/GyanD/codexffmpeg/releases/download/7.1.1/ffmpeg-7.1.1-essentials_build.zip",
+    "sha256": "04861d3339c5ebe38b56c19a15cf2c0cc97f5de4fa8910e4d47e5e6404e4a2d4",
+    "license_url": "https://ffmpeg.org/legal.html"
+  }
+}
