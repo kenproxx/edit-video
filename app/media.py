@@ -10,6 +10,8 @@ import tempfile
 from contextlib import contextmanager
 from PIL import Image
 from .resources import binary_path
+from .processes import run_media_process
+import threading
 
 @dataclass(frozen=True)
 class MediaInfo:
@@ -69,9 +71,9 @@ def _parse_info(data: dict) -> MediaInfo:
     return MediaInfo(w, h, duration, fps, audio is not None, rotation, False, offset)
 
 
-def probe(path: Path) -> MediaInfo:
+def probe(path: Path, cancel: threading.Event | None = None) -> MediaInfo:
     try:
-        result = subprocess.run([str(binary_path('ffprobe')), '-v', 'error', '-show_streams', '-show_format', '-of', 'json', str(path.resolve())], capture_output=True, text=True, encoding='utf-8', errors='replace', timeout=30, check=True)
+        result = run_media_process([str(binary_path('ffprobe')), '-v', 'error', '-show_streams', '-show_format', '-of', 'json', str(path.resolve())],30,cancel)
         return _parse_info(json.loads(result.stdout))
     except (subprocess.CalledProcessError, subprocess.TimeoutExpired, json.JSONDecodeError) as exc:
         raise ValueError('Không đọc được video (file hỏng, codec hoặc thời gian đọc quá lâu)') from exc

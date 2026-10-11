@@ -4,6 +4,8 @@ import math
 from pathlib import Path
 import subprocess
 import tempfile
+import threading
+from .processes import run_media_process
 from .media import MediaInfo, normalization_filter, frame_destination
 from .models import EditOptions, validate_options
 from .overlays import write_text, write_logo
@@ -85,7 +87,7 @@ def prepare_render(source: Path, info: MediaInfo, options: EditOptions, destinat
     return PreparedRender(args, duration)
 
 
-def render_preview(source: Path, info: MediaInfo, options: EditOptions, time: float, destination: Path) -> Path:
+def render_preview(source: Path, info: MediaInfo, options: EditOptions, time: float, destination: Path, cancel: threading.Event | None = None) -> Path:
     if not math.isfinite(time) or not 0 <= time < info.duration / options.speed:
         raise ValueError('Thời điểm preview nằm ngoài video')
     with tempfile.TemporaryDirectory(prefix='video-preview-') as directory, frame_destination(source, destination) as temp:
@@ -93,7 +95,7 @@ def render_preview(source: Path, info: MediaInfo, options: EditOptions, time: fl
         # Output seek preserves output-timeline intro enable and the same filter graph.
         args += ['-filter_complex_threads', '2', '-filter_complex', graph, '-map', '[vout]', '-an', '-ss', f'{time:.9g}', '-frames:v', '1', '-threads', '2', str(temp.resolve())]
         try:
-            subprocess.run(args, capture_output=True, check=True, timeout=60)
+            run_media_process(args,60,cancel)
         except (subprocess.CalledProcessError, subprocess.TimeoutExpired) as exc:
             detail = getattr(exc, 'stderr', b'') or b''
             raise ValueError('Không render được preview: ' + detail.decode('utf-8', errors='replace')[-2000:]) from exc
