@@ -1,6 +1,6 @@
 # Video Editor
 
-App desktop Python để chỉnh một video và xuất MP4 mới. **Đã có GUI, engine và script build Windows. Cloud hiện tại là Linux: chưa tạo hoặc xác thực Windows EXE; cần chạy workflow Windows hoặc build trên Windows.**
+App desktop Python để chỉnh một video và xuất MP4 mới. **Đã có GUI, engine và Windows EXE được build/kiểm chứng trên GitHub Actions. Release `v0.1.0` giữ trạng thái nháp trong khi chờ corresponding source của FFmpeg trước khi phân phối công khai.**
 
 ## Chức năng
 
@@ -25,7 +25,7 @@ Kết quả dự kiến: `dist/VideoEditor.exe`, SHA-256 và thư mục giấy p
 
 Cache ở `.build-cache/` và được kiểm tra trước khi dùng archive; venv được tạo lại mỗi lần. Nếu cache sai hash, script báo file lỗi và dừng; xóa đúng file đó để tải lại. Build dùng PowerShell x64 có sẵn trên Windows; `build.sh` cần Git Bash.
 
-Workflow [Windows standalone editor](.github/workflows/windows-build.yml) chuẩn bị build khi PATH không cung cấp Python/FFmpeg, build lại, kiểm tra cache bị sửa, rồi chạy chính EXE với PATH giới hạn, đường dẫn tiếng Việt, thư mục app chỉ đọc và GUI startup/close. Artifact chỉ được upload nếu những bước đó qua; workflow chưa được chạy trong phiên cloud này. Không tự push hoặc publish release.
+Workflow [Windows standalone editor](.github/workflows/windows-build.yml) chuẩn bị build khi PATH không cung cấp Python/FFmpeg, build lại, kiểm tra cache bị sửa, rồi chạy chính EXE với PATH giới hạn, đường dẫn tiếng Việt, thư mục app chỉ đọc và GUI startup/close. Artifact chỉ được upload nếu những bước đó qua; Run [38155133422](https://github.com/kenproxx/edit-video/actions/runs/38155133422) đã chạy thành công trên Windows. Workflow build không tự publish release.
 
 Trước khi phân phối bản chứa FFmpeg GPL, bổ sung complete corresponding source của static build; xem [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md). Giấy phép đi kèm hiện không thay thế source bundle còn thiếu.
 
@@ -79,4 +79,12 @@ CLI headless cũng chạy từ source (thư mục output và thư mục cha củ
 .venv/bin/python main.py --smoke-test input.mp4 --output-dir output --report report.json
 ```
 
-Xem [báo cáo phase 2](docs/phase-2-report.md), [báo cáo phase 3](docs/phase-3-report.md), [báo cáo phase 4](docs/phase-4-report.md), [đặc tả](docs/superpowers/specs/2026-10-11-video-editor-design.md) và [kế hoạch](docs/superpowers/plans/2026-10-11-video-editor.md). Kiểm chứng Windows/EXE và source bundle FFmpeg vẫn còn chờ.
+Xem [báo cáo phase 2](docs/phase-2-report.md), [báo cáo phase 3](docs/phase-3-report.md), [báo cáo phase 4](docs/phase-4-report.md), [đặc tả](docs/superpowers/specs/2026-10-11-video-editor-design.md) và [kế hoạch](docs/superpowers/plans/2026-10-11-video-editor.md). Windows/EXE đã qua CI; source bundle FFmpeg để phân phối công khai vẫn còn chờ.
+
+## GitHub Release
+
+Release nháp `v0.1.0` lấy artifact của run Windows đã thành công, kèm EXE trực tiếp, ZIP gồm notices/licenses và `SHA256SUMS.txt`. Chủ repository có thể mở [Releases](https://github.com/kenproxx/edit-video/releases) để tải assets của bản nháp.
+
+Workflow `Attach verified EXE to draft release` nhận tag bản nháp và run ID của workflow Windows. Nó chỉ nhận build thành công từ `main` đúng commit đích release, kiểm tra digest artifact + hash EXE + PE x64 và giữ release ở trạng thái draft. Asset đã có chỉ được giữ lại nếu cùng digest; không ghi đè file khác và không tự Publish.
+
+Trong cloud, API đọc/tạo release hoạt động nhưng upload trực tiếp trả 401; workflow dùng token repository để upload. Trước Publish cần bổ sung complete corresponding source của FFmpeg static; xem `THIRD_PARTY_NOTICES.md`.

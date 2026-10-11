@@ -1,0 +1,56 @@
+name: Attach verified EXE to draft release
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Existing draft release version
+        required: true
+        default: v0.1.0
+      run_id:
+        description: Successful Windows standalone editor run from main
+        required: true
+permissions:
+  contents: write
+  actions: read
+jobs:
+  attach-assets:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      GH_TOKEN: ${{ github.token }}
+      RELEASE_TAG: ${{ inputs.tag }}
+      BUILD_RUN_ID: ${{ inputs.run_id }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Read tested build and draft metadata
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ "$BUILD_RUN_ID" =~ ^[0-9]+$ ]]
+          [[ "$RELEASE_TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-[A-Za-z0-9.-]+)?$ ]]
+          gh api "repos/$GITHUB_REPOSITORY/actions/runs/$BUILD_RUN_ID" > run.json
+          gh api "repos/$GITHUB_REPOSITORY/releases" --paginate --jq ".[] | select(.tag_name == \"$RELEASE_TAG\")" > release.json
+          gh api "repos/$GITHUB_REPOSITORY/actions/runs/$BUILD_RUN_ID/artifacts" --jq '.artifacts | map(select(.name == "VideoEditor-windows-x64" and .expired == false)) | if length == 1 then .[0] else error("Expected one unexpired Windows artifact") end' > artifact.json
+          artifact_id=$(python3 -c 'import json; print(json.load(open("artifact.json"))["id"])')
+          gh api "repos/$GITHUB_REPOSITORY/actions/artifacts/$artifact_id/zip" > artifact.zip
+      - name: Verify artifact and executable checksums
+        run: |
+          python3 scripts/prepare-release.py --archive artifact.zip --artifact-json artifact.json --release-json release.json --run-json run.json --output-dir release-assets
+      - name: Attach assets without publishing or replacing existing files
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          import hashlib,json,os,subprocess
+          repo=os.environ['GITHUB_REPOSITORY']
+          release=json.load(open('release.json'))
+          current=json.loads(subprocess.check_output(['gh','api',f'repos/{repo}/releases/{release["id"]}']))
+          if not current['draft']: raise SystemExit('Release must still be a draft')
+          existing={a['name']:a for a in current['assets']}
+          for path in json.load(open('release-assets/upload-files.json')):
+              name=os.path.basename(path)
+              with open(path,'rb') as f: expected='sha256:'+hashlib.file_digest(f,'sha256').hexdigest()
+              if name in existing:
+                  if existing[name].get('digest')!=expected: raise SystemExit('Existing release asset differs: '+name)
+                  continue
+              subprocess.run(['gh','release','upload',os.environ['RELEASE_TAG'],path,'--repo',repo],check=True)
+          PY

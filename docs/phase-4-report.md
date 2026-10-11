@@ -64,3 +64,15 @@ Người dùng đã qua bootstrap/dependency install nhưng bị báo thiếu t�
 Nguồn: https://github.com/FFmpeg/FFmpeg/blob/n8.1.2/fftools/opt_common.c . Regression dùng bảng đại diện dựa trên định dạng upstream ở boundary output của subprocess, kiểm tra cả table 7/8 và trường hợp thiếu gblur/libx264/aac. Trước sửa: 4 failed/1 passed; sau sửa: 5 passed. Không bỏ capability validation hay thay bundle/hash để né lỗi.
 
 Full suite sau sửa parser: **112 passed in 38.26s** trên Linux Python 3.13/Tk8.6, Xvfb và PowerShell 7; không skip. Build EXE native Windows vẫn phải chạy lại để xác thực các bước còn lại.
+
+## Windows acceptance và release nháp v0.1.0
+
+Sau hai bản sửa, Windows CI run [38155133422](https://github.com/kenproxx/edit-video/actions/runs/38155133422) tại commit `53665fc54b6862b0e46059e25bc4953f5a022d04` **thành công**. Đã xác nhận riêng từng step: bootstrap không có Python/FFmpeg trên PATH, build lại, tamper/cache verification, chính EXE xuất video với Unicode + thư mục app chỉ đọc + PATH giới hạn, GUI startup/close và upload artifact. Các ghi chú "Windows chưa chạy" ở phần lịch sử phía trên phản ánh thời điểm trước run này; native Windows acceptance hiện đã qua.
+
+Artifact `VideoEditor-windows-x64`, ID11708362039, 92,923,753 bytes, digest `sha256:1e0869f98e7033cd349c877eec3fdc7f1c5a20d34612d8de6c2ffa7012527f66`. Download thực tế khớp digest GitHub; EXE 93,241,541 bytes có SHA256 `b7f2d27a9cf1a3e13d322b6f4fb71d12a65a5b794a5d87368bb1f04a3c09af63`, khớp checksum build; xác nhận PE Windows x64, ZIP kèm 53 license files.
+
+Người dùng yêu cầu tạo GitHub Release. Đã tạo draft `v0.1.0` tại commit build trên. Upload asset trực tiếp từ cloud trả401 ở `uploads.github.com` dù API đọc/tạo release có quyền; dùng workflow repository `release-draft.yml` với GITHUB_TOKEN để đính kèm assets, không yêu cầu người dùng cung cấp token. `prepare-release.py` chỉ nhận successful main Windows workflow đúng commit release, draft state, unexpired artifact đúng tên/digest, EXE đúng hash/PE x64 và notices/license. Không thay thế output/asset đang có khác hash; không Publish release.
+
+Regression release preparer: 10 RED trước triển khai, 10 GREEN sau triển khai; chạy CLI với chính artifact/metadata GitHub đã xác thực thành công. Release tiếp tục ở draft vì complete corresponding source cho FFmpeg static chưa được cung cấp; không coi license/core link là thay thế source bundle.
+
+Full suite sau thêm release preparer/workflow: **122 passed in 37.81s**, không skip. Kiểm chứng CLI preparer dùng artifact thực tế thành công; bước upload sẽ được xác nhận bằng workflow và metadata assets GitHub.

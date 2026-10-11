@@ -100,7 +100,7 @@
 - [x] Run `python -m pytest tests/test_packaging.py -q`; verify red tests. Obtain version/hash/license metadata from authoritative release sources; do not invent checksums or bypass blocked domains.
 - [x] Implement signed Python per-user private bootstrap when matching Python unavailable, venv installation and integrity-verified FFmpeg/ffprobe bundle (libx264/AAC, required filters). Build script must fail on every failed download/install/build; repeat invocation reuses only verified artifacts. Include CustomTkinter resources and distribution licenses. build.sh requires Windows Git Bash and invokes PowerShell, reports Linux limitation explicitly. Add Windows CI artifact build/smoke without release publishing.
 - [x] Document offline EXE usage, source setup, effects coordinates/preview limitations, build commands, third-party licenses and phase validation. Do not claim unfinished platform tests passed.
-- [ ] Run Linux full suite. On Windows without Python/FFmpeg on PATH run bootstrap twice; verify both builds, run EXE smoke with restricted PATH, Unicode paths and read-only app directory, launch GUI and export synthetic fixture. Inspect bundled licenses. If Windows executor unavailable, report Windows build/EXE checks unrun and keep that deliverable pending; do not substitute Linux PyInstaller output.
+- [x] Run Linux full suite. On Windows without Python/FFmpeg on PATH run bootstrap twice; verify both builds, run EXE smoke with restricted PATH, Unicode paths and read-only app directory, launch GUI and export synthetic fixture. Inspect bundled licenses. If Windows executor unavailable, report Windows build/EXE checks unrun and keep that deliverable pending; do not substitute Linux PyInstaller output.
 - [x] Commit `build: bootstrap and package standalone Windows editor`; report final test counts, EXE location if actually built, and remaining platform limitations. Obtain whole-branch review using selected execution method before declaring implementation complete.
 
 
@@ -119,3 +119,7 @@ Task 5 completed with Vietnamese GUI, cancellable preview/probe and review fixes
 ## Phase 4 execution record
 
 Bootstrap/spec/CLI/CI and documentation implemented; Linux tests and whole-branch review recorded in `docs/phase-4-report.md`. Windows acceptance and the built EXE remain pending because no Windows executor is available. Complete matching FFmpeg corresponding source is also pending before public redistribution. Keep task 6 platform acceptance unchecked; do not call the complete Windows deliverable validated.
+
+## Windows acceptance and first draft release
+
+Windows CI run38155133422 from53665fc completed successfully: bootstrap without Python/FFmpegPATH, build twice, tamper/reuse cache checks, actualEXE export withUnicode/read-onlydirectory/restrictedPATH, nativeGUI startup/close, license files included. This completes the previously unrun task6 platform acceptance. Public redistribution remains pending complete FFmpeg corresponding source. User then requested GitHub release; draftv0.1.0 uses this tested artifact. See docs/phase-4-report.md and README release instructions.
