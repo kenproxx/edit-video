@@ -24,10 +24,14 @@ def verify_media_tools() -> dict:
     versions = {name:_run([path,'-version']).splitlines()[0] for name,path in [('ffmpeg',ffmpeg),('ffprobe',ffprobe)]}
     encoders = _run([ffmpeg,'-hide_banner','-encoders'])
     filters = _run([ffmpeg,'-hide_banner','-filters'])
-    names = {match.group(1) for line in filters.splitlines() if (match:=re.match(r'^\s*[TSC.]{3}\s+(\w+)\s',line))}
+    # FFmpeg 8 removed the command-support column; FFmpeg 7 has three flags.
+    names = {match.group(1) for line in filters.splitlines() if (match:=re.match(r'^\s*[TSC.]{2,3}\s+(\w+)\s',line))}
     missing = REQUIRED_FILTERS - names
-    if missing or not re.search(r'^\s*V\S*\s+libx264\s',encoders,re.M) or not re.search(r'^\s*A\S*\s+aac\s',encoders,re.M):
-        raise ValueError('FFmpeg thiếu libx264/AAC hoặc filters: '+', '.join(sorted(missing)))
+    for media,codec in (('V','libx264'),('A','aac')):
+        if not re.search(rf'^\s*{media}\S*\s+{codec}\s',encoders,re.M):
+            missing.add(codec)
+    if missing:
+        raise ValueError('FFmpeg thiếu codec/filter: '+', '.join(sorted(missing)))
     return versions
 
 

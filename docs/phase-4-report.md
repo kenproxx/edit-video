@@ -56,3 +56,11 @@ Sau merge, người dùng báo `Join-Path ... Path ... empty string` ngay khi m�
 Regression thực thi chính param block của production với script root rỗng: RED lỗi `Join-Path`, GREEN sau sửa. Test thứ hai chạy bản sao script ở đường dẫn Unicode/khoảng trắng từ cwd khác, xác nhận default manifest/cache thuộc project và không tạo file ở cwd. Hai test chạy qua trên PowerShell 7 Linux; không thay thế kiểm chứng toàn bộ installer/EXE Windows.
 
 Full suite sau bản sửa bootstrap: **107 passed in 36.67s**, không skip. Kiểm chứng dùng Python 3.13/Tk8.6 hệ thống, virtual display Xvfb và PowerShell 7 trên Linux.
+
+## Sửa bộ kiểm tra capability của FFmpeg 8
+
+Người dùng đã qua bootstrap/dependency install nhưng bị báo thiếu tất cả filter ở `prepare-package.py`. Đối chiếu `fftools/opt_common.c::show_filters` của FFmpeg n8.1.2 xác nhận table đổi từ ba cột cờ xuống hai (`printf(" %c%c ...")`), bỏ cột command support. Regex cũ chỉ chấp nhận ba nên đọc sai capability của bundle 8.1.2 đã khóa. Đã hỗ trợ cả hai định dạng, giữ kiểm tra H.264/AAC và toàn bộ filter; thông báo lỗi liệt kê riêng những codec/filter thực sự thiếu.
+
+Nguồn: https://github.com/FFmpeg/FFmpeg/blob/n8.1.2/fftools/opt_common.c . Regression dùng bảng đại diện dựa trên định dạng upstream ở boundary output của subprocess, kiểm tra cả table 7/8 và trường hợp thiếu gblur/libx264/aac. Trước sửa: 4 failed/1 passed; sau sửa: 5 passed. Không bỏ capability validation hay thay bundle/hash để né lỗi.
+
+Full suite sau sửa parser: **112 passed in 38.26s** trên Linux Python 3.13/Tk8.6, Xvfb và PowerShell 7; không skip. Build EXE native Windows vẫn phải chạy lại để xác thực các bước còn lại.

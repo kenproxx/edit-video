@@ -172,3 +172,62 @@ def test_bootstrap_default_paths_are_relative_to_script_not_cwd(tmp_path):
     assert result.returncode==0,result.stderr
     assert 'Verified 2' in result.stdout
     assert not list(other.iterdir())
+
+
+# FFmpeg 8.1.2 opt_common.c show_filters prints two flags (%c%c),
+# whereas FFmpeg 7 prints three. Same capabilities, different table format.
+FILTER_TABLE_8 = '''Filters:
+  T.. = Timeline support
+  .S. = Slice threading
+  A = Audio input/output
+  V = Video input/output
+  ------
+ .. asetpts           A->A       Set timestamps for the output audio frame.
+ .. atempo            A->A       Adjust audio tempo.
+ .. atrim             A->A       Pick one continuous section from the input.
+ .. crop              V->V       Crop the input video.
+ .. format            V->V       Convert the input video to one of the specified pixel formats.
+ .. fps               V->V       Force constant framerate.
+ TS gblur             V->V       Apply Gaussian Blur filter.
+ .S hflip             V->V       Horizontally flip the input video.
+ TS overlay           VV->V      Overlay a video source on top of the input.
+ .. scale             V->V       Scale the input video size and/or convert the image format.
+ .. setpts            V->V       Set timestamps for the output video frame.
+ .. setsar            V->V       Set the pixel sample aspect ratio.
+ .. split             V->N       Pass on the input to N video outputs.
+ .S vflip             V->V       Flip the input video vertically.
+'''
+ENCODER_TABLE = '''Encoders:
+ V..... libx264       libx264 H.264 / AVC (codec h264)
+ A..... aac           AAC (Advanced Audio Coding)
+'''
+
+
+def media_tables(monkeypatch,filters=FILTER_TABLE_8,encoders=ENCODER_TABLE):
+    from app import selftest
+    # Isolate the external tool version; assertions check verifier behavior.
+    def output(args):
+        if args[-1]=='-filters': return filters
+        if args[-1]=='-encoders': return encoders
+        return Path(args[0]).stem+' version 8.1.2\n'
+    monkeypatch.setattr(selftest,'_run',output)
+    return selftest
+
+
+@pytest.mark.parametrize('flag_columns',[2,3])
+def test_tool_validation_accepts_ffmpeg_7_and_8_tables(monkeypatch,flag_columns):
+    table=FILTER_TABLE_8
+    if flag_columns==3:
+        table='\n'.join(line[:3]+'.'+line[3:] if line.startswith((' .. ',' TS ',' .S ')) else line for line in table.splitlines())
+    selftest=media_tables(monkeypatch,filters=table)
+    assert selftest.verify_media_tools()['ffmpeg']=='ffmpeg version 8.1.2'
+
+
+@pytest.mark.parametrize('missing',['gblur','libx264','aac'])
+def test_tool_validation_still_rejects_missing_capabilities(monkeypatch,missing):
+    filters='\n'.join(line for line in FILTER_TABLE_8.splitlines() if missing not in line)
+    encoders='\n'.join(line for line in ENCODER_TABLE.splitlines() if missing not in line)
+    selftest=media_tables(monkeypatch,filters,encoders)
+    with pytest.raises(ValueError,match=missing) as error:
+        selftest.verify_media_tools()
+    assert str(error.value).split(': ',1)[1]==missing
