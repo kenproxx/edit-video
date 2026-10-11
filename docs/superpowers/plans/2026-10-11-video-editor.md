@@ -83,10 +83,10 @@
 
 **Interfaces:** Consumes all phase 2 interfaces. Produces `VideoEditorApp` CustomTkinter root, `OptionsPanel.read_options()->EditOptions`, `PreviewController.request(source:Path,info:MediaInfo,options:EditOptions,time:float)->int`, `.poll()->list[PreviewResult]`, `.close()->None`; generation IDs reject stale completion. Canvas uses task 1 geometry; crop selection uses source-after-flip view, other selections post-crop view.
 
-- [ ] Tests cover file chooser/name default, folder and validation, each feature reaching EditOptions, presets/drag mapping under resized letterboxing, crop/lật change invalidating dependent selections, text defaults, logo/font picker, overwrite/input protection, worker event progress/cancel/error. Force preview completion out of order and assert newest generation remains displayed; ensure UI updates only main thread and controls remain available at narrow size. Display-dependent tests explicitly report unavailable display as unrun, never validated.
-- [ ] Run controller tests and GUI tests with `xvfb-run -a python -m pytest tests/test_preview.py tests/test_ui.py -q` on Linux (or native Windows display); confirm expected red tests.
-- [ ] Implement Vietnamese scrolling option groups, preview timeline, crop/blur/text/logo selections and numeric fallback controls. Debounce preview, disable conflicting controls during render, keep cancel/progress fixed, prevent close leaving child process. Startup does not install packages.
-- [ ] Run full tests plus interactive or automated GUI smoke: select fixture, preview all edits, export, cancel, reopen. Commit `feat: add Vietnamese desktop video editor`. Report phase 3 evidence.
+- [x] Tests cover file chooser/name default, folder and validation, each feature reaching EditOptions, presets/drag mapping under resized letterboxing, crop/lật change invalidating dependent selections, text defaults, logo/font picker, overwrite/input protection, worker event progress/cancel/error. Force preview completion out of order and assert newest generation remains displayed; ensure UI updates only main thread and controls remain available at narrow size. Display-dependent tests explicitly report unavailable display as unrun, never validated.
+- [x] Run controller tests and GUI tests with `xvfb-run -a python -m pytest tests/test_preview.py tests/test_ui.py -q` on Linux (or native Windows display); confirm expected red tests.
+- [x] Implement Vietnamese scrolling option groups, preview timeline, crop/blur/text/logo selections and numeric fallback controls. Debounce preview, disable conflicting controls during render, keep cancel/progress fixed, prevent close leaving child process. Startup does not install packages.
+- [x] Run full tests plus interactive or automated GUI smoke: select fixture, preview all edits, export, cancel, reopen. Commit `feat: add Vietnamese desktop video editor`. Report phase 3 evidence.
 
 ## Phase 4 — build và bàn giao
 
@@ -110,3 +110,7 @@ Khuyến nghị Native: một agent triển khai theo thứ tự vì GUI/worker/
 ## Phase 2 execution record
 
 Tasks 1–4 completed; see `docs/phase-2-report.md` for tests, review fixes and platform limitations. `MediaInfo` now adds optional `audio_offset: float = 0` to preserve stream synchronization; existing constructors remain compatible. Preview/export share explicit CFR sampling. User requires a stop after this phase; task 5 is not authorized until the next request.
+
+## Phase 3 execution record
+
+Task 5 completed with Vietnamese GUI, cancellable preview/probe and review fixes. See `docs/phase-3-report.md`. Phase 4 remains pending until the user requests it.

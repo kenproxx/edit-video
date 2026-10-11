@@ -6,7 +6,7 @@ import tkinter as tk
 from tkinter import filedialog, messagebox
 import customtkinter as ctk
 from .loader import MediaLoader
-from .models import validate_options, default_output
+from .models import Rect, validate_options, default_output
 from .output import reserve_output
 from .preview import PreviewController
 from .worker import RenderWorker
@@ -127,6 +127,7 @@ class VideoEditorApp(ctk.CTk):
 
     def options_changed(self,reason):
         if self._closing or self.worker.running: return
+        self._last_terminal = None
         self._invalidate_preview()
         if reason in ('crop','flip'):
             self._warning = 'Crop/lật đã đổi: chọn lại vùng blur và vị trí logo/text trước khi bật lại.'
@@ -142,20 +143,26 @@ class VideoEditorApp(ctk.CTk):
         if self.media_info is None or self._closing or self.worker.running: return
         try:
             mode = self._mode()
-            if mode == 'crop': options = self.options.base_options()
+            selection = None
+            if mode == 'crop':
+                options = self.options.base_options()
+                if self.options.vars['crop_enabled'].get():
+                    try:
+                        selection = Rect(*(int(self.options.vars['crop_'+field].get()) for field in ('x','y','width','height')))
+                        validate_options(replace(options,crop=selection),self.media_info.width,self.media_info.height,self.media_info.duration)
+                    except ValueError:
+                        selection = None
             else:
-                options = self.options.read_options()
-                if mode in ('blur','logo','watermark','intro'):
-                    options = replace(options,**{mode:None})
+                options = self.options.read_options(exclude=mode)
             validate_options(options,self.media_info.width,self.media_info.height,self.media_info.duration)
             end = max(0,self.media_info.duration/options.speed - 1/self.media_info.fps)
             self.timeline.configure(to=max(.001,end))
             time = min(max(0,self.time_var.get()),end)
             self.time_var.set(time)
             self.time_label.configure(text=f'{time:.2f} s (thời gian đầu ra)')
-            self._preview_context = (mode,options)
+            self._preview_context = (mode,options,selection)
             self._preview_generation = self.preview.request(self.source_path,self.media_info,options,time)
-            if not self._warning: self.status_var.set('Đang cập nhật ảnh xem trước…')
+            if not self._warning and self._last_terminal is None: self.status_var.set('Đang cập nhật ảnh xem trước…')
         except (ValueError,OSError) as exc:
             self.status_var.set(str(exc))
 
@@ -216,6 +223,9 @@ class VideoEditorApp(ctk.CTk):
             self.status_var.set('Xuất thất bại; xem chi tiết lỗi')
             if not self._closing: messagebox.showerror('Xuất thất bại',event.message,parent=self)
 
+        if not self._closing:
+            self._request_preview()
+
     def _poll(self):
         if self._destroyed: return
         for result in self.loader.poll():
@@ -233,13 +243,14 @@ class VideoEditorApp(ctk.CTk):
             if result.generation == self._preview_generation and not self._closing:
                 if result.error: self.status_var.set(result.error)
                 else:
-                    mode,options = self._preview_context
+                    mode,options,selection = self._preview_context
                     self._display_mode = mode
                     self.preview_canvas.mode = mode
                     self.preview_canvas.set_image(result.image)
                     self.preview_canvas.enabled = not self.worker.running
-                    if mode == 'crop' and self.options.vars['crop_enabled'].get(): self.preview_canvas.set_selection(self.options.read_options().crop)
-                    self.status_var.set(self._warning or 'Ảnh xem trước đã cập nhật')
+                    if mode == 'crop' and selection is not None: self.preview_canvas.set_selection(selection)
+                    if self._last_terminal is None:
+                        self.status_var.set(self._warning or 'Ảnh xem trước đã cập nhật')
             if result.image: result.image.close()
         for event in self.worker.poll(): self._handle_worker_event(event)
         if self._closing and not self.worker.running and not self.preview.busy and not self.loader.busy:

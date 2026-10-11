@@ -284,3 +284,55 @@ def test_worker_error_reenables_ui(editor,clips,tmp_path):
     assert editor.export_button.cget('state')=='normal' and editor.cancel_button.cget('state')=='disabled'
     assert editor._test_messages[-1][0]=='error'
     assert not (tmp_path/'out.mp4').exists()
+
+
+def test_incomplete_crop_does_not_stop_polling(editor,clips):
+    load(editor,clips['source'])
+    errors=[]
+    editor.report_callback_exception=lambda *args:errors.append(args)
+    editor.options.apply_region('crop',Rect(0,0,160,120))
+    editor.mode_var.set('crop');editor.selection_mode_changed()
+    editor.options.vars['crop_x'].set('')
+    spin(editor,lambda:editor._display_mode=='crop' or bool(errors))
+    assert not errors
+    editor.options.vars['crop_x'].set('0')
+    spin(editor,lambda:editor._display_mode=='crop')
+    assert editor.preview_canvas.enabled
+
+
+def test_export_restores_selection_without_mode_toggle(editor,clips,tmp_path):
+    load(editor,clips['source'])
+    editor.options.apply_region('crop',Rect(0,0,160,120))
+    editor.mode_var.set('crop');editor.selection_mode_changed()
+    spin(editor,lambda:editor._display_mode=='crop')
+    editor.output_dir_var.set(str(tmp_path));editor.output_name_var.set('restored.mp4')
+    editor.start_export()
+    spin(editor,lambda:editor._last_terminal is not None)
+    spin(editor,lambda:editor._display_mode=='crop')
+    assert editor.preview_canvas.enabled
+    assert editor.status_var.get().startswith('Đã xuất:')
+
+
+def test_placement_can_repair_incomplete_selected_layer(editor,clips):
+    load(editor,clips['source'])
+    editor.options.apply_region('blur',Rect(10,10,30,30))
+    editor.options.vars['blur_x'].set('')
+    editor.mode_var.set('blur');editor.selection_mode_changed()
+    spin(editor,lambda:editor._display_mode=='blur')
+    editor._selected('blur',Rect(20,20,30,30))
+    assert editor.options.read_options().blur==Rect(20,20,30,30)
+
+
+@pytest.mark.parametrize('kind',['cancelled','error'])
+def test_terminal_event_restores_blur_selection(editor,clips,kind):
+    from app.worker import WorkerEvent
+    load(editor,clips['source'])
+    editor.mode_var.set('blur');editor.selection_mode_changed()
+    spin(editor,lambda:editor._display_mode=='blur')
+    editor._invalidate_preview();editor._set_busy(True)
+    editor._handle_worker_event(WorkerEvent(kind,message='test failure'))
+    spin(editor,lambda:editor._display_mode=='blur')
+    canvas=editor.preview_canvas;box=canvas.image_box
+    canvas.press(SimpleNamespace(x=box.x+box.width//4,y=box.y+box.height//4))
+    canvas.release(SimpleNamespace(x=box.x+box.width//2,y=box.y+box.height//2))
+    assert editor.options.read_options().blur is not None

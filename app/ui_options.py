@@ -206,18 +206,18 @@ class OptionsPanel(ctk.CTkScrollableFrame):
     def base_options(self):
         return EditOptions(speed=float(self.vars['speed'].get().replace(',','.')),flip_horizontal=self.vars['flip_horizontal'].get(),flip_vertical=self.vars['flip_vertical'].get())
 
-    def read_options(self) -> EditOptions:
+    def read_options(self, exclude: str | None = None) -> EditOptions:
         try:
             base = self.base_options()
             def rect(prefix):
-                if not self.vars[prefix+'_enabled'].get(): return None
+                if prefix == exclude or not self.vars[prefix+'_enabled'].get(): return None
                 return Rect(*(int(self.vars[prefix+'_'+field].get()) for field in ('x','y','width','height')))
             logo = None
-            if self.vars['logo_enabled'].get():
+            if exclude != 'logo' and self.vars['logo_enabled'].get():
                 logo = LogoOverlay(Path(self.vars['logo_path'].get()),int(self.vars['logo_x'].get()),int(self.vars['logo_y'].get()),int(self.vars['logo_width'].get()),float(self.vars['logo_opacity'].get().replace(',','.')))
             from dataclasses import replace
-            intro = self.text_panels['intro'].read()
-            return replace(base,crop=rect('crop'),blur=rect('blur'),blur_strength=int(self.vars['blur_strength'].get()) if self.vars['blur_enabled'].get() else 10,logo=logo,watermark=self.text_panels['watermark'].read(),intro=intro,intro_duration=float(self.vars['intro_duration'].get().replace(',','.')) if intro else 1)
+            intro = None if exclude == 'intro' else self.text_panels['intro'].read()
+            return replace(base,crop=rect('crop'),blur=rect('blur'),blur_strength=int(self.vars['blur_strength'].get()) if exclude != 'blur' and self.vars['blur_enabled'].get() else 10,logo=logo,watermark=None if exclude == 'watermark' else self.text_panels['watermark'].read(),intro=intro,intro_duration=float(self.vars['intro_duration'].get().replace(',','.')) if intro else 1)
         except ValueError as exc:
             raise ValueError('Kiểm tra các ô số: X/Y/kích thước là số nguyên; tốc độ/thời gian/độ đậm là số thực') from exc
 
