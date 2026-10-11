@@ -76,3 +76,5 @@ Người dùng yêu cầu tạo GitHub Release. Đã tạo draft `v0.1.0` tại 
 Regression release preparer: 10 RED trước triển khai, 10 GREEN sau triển khai; chạy CLI với chính artifact/metadata GitHub đã xác thực thành công. Release tiếp tục ở draft vì complete corresponding source cho FFmpeg static chưa được cung cấp; không coi license/core link là thay thế source bundle.
 
 Full suite sau thêm release preparer/workflow: **122 passed in 37.81s**, không skip. Kiểm chứng CLI preparer dùng artifact thực tế thành công; bước upload sẽ được xác nhận bằng workflow và metadata assets GitHub.
+
+Workflow đính kèm [38156770339](https://github.com/kenproxx/edit-video/actions/runs/38156770339) **thành công** với GITHUB_TOKEN của repository. Draft [v0.1.0](https://github.com/kenproxx/edit-video/releases/tag/untagged-162b26ada8a4a17eccbc) có đủ bốn asset: `VideoEditor.exe`, `VideoEditor-windows-x64-v0.1.0.zip`, `SHA256SUMS.txt`, `THIRD_PARTY_NOTICES.md`. Đã đọc lại metadata GitHub và xác nhận state uploaded, size và digest SHA256 của từng asset khớp file chuẩn bị cục bộ. Release vẫn draft, chưa Publish công khai; corresponding source FFmpeg tiếp tục pending.
