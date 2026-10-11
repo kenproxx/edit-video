@@ -1,0 +1,48 @@
+name: Windows standalone editor
+on:
+  workflow_dispatch:
+  push:
+    branches: [main, work]
+  pull_request:
+permissions:
+  contents: read
+jobs:
+  build-and-smoke:
+    runs-on: windows-2022
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+      - name: Bootstrap without Python or FFmpeg on PATH
+        shell: powershell
+        run: |
+          $env:PATH = "$env:SystemRoot\System32;$env:SystemRoot;$env:SystemRoot\System32\WindowsPowerShell\v1.0"
+          & .\scripts\bootstrap-build.ps1
+          if ($LASTEXITCODE -ne 0) { throw 'First build failed' }
+      - name: Verify cache and reject a tampered download
+        shell: powershell
+        run: |
+          $manifest = Get-Content scripts/build-manifest.json -Raw | ConvertFrom-Json
+          $bad = Join-Path $env:RUNNER_TEMP 'bad-artifact-cache'
+          New-Item -ItemType Directory -Path $bad -Force | Out-Null
+          [IO.File]::WriteAllText((Join-Path $bad $manifest.ffmpeg.filename),'tampered')
+          & powershell.exe -NoProfile -File scripts/bootstrap-build.ps1 -VerifyCache -CacheDir $bad
+          if ($LASTEXITCODE -eq 0) { throw 'Tampered cache incorrectly accepted' }
+          & powershell.exe -NoProfile -File scripts/bootstrap-build.ps1 -VerifyCache
+          if ($LASTEXITCODE -ne 0) { throw 'Verified cache was rejected' }
+      - name: Repeat build with verified cache
+        shell: powershell
+        run: |
+          $env:PATH = "$env:SystemRoot\System32;$env:SystemRoot;$env:SystemRoot\System32\WindowsPowerShell\v1.0"
+          & .\scripts\bootstrap-build.ps1
+          if ($LASTEXITCODE -ne 0) { throw 'Repeat build failed' }
+      - name: EXE smoke, Unicode paths, read-only app directory and GUI
+        shell: powershell
+        run: |
+          & .\.build-cache\venv\Scripts\python.exe scripts/smoke-packaged.py --exe dist/VideoEditor.exe --ffmpeg tools/ffmpeg.exe --work-dir "$env:RUNNER_TEMP\VideoEditor-smoke"
+          if ($LASTEXITCODE -ne 0) { throw 'Packaged acceptance failed' }
+      - name: Upload verified build files
+        uses: actions/upload-artifact@v4
+        with:
+          name: VideoEditor-windows-x64
+          path: dist/
+          if-no-files-found: error
