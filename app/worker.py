@@ -132,12 +132,24 @@ class RenderWorker:
         except Exception as exc:
             terminal = WorkerEvent('cancelled' if self._cancel.is_set() else 'error', message=str(exc))
         finally:
-            if process is not None and process.poll() is None:
-                process.kill()
-                process.wait(timeout=5)
-            if temp is not None:
-                temp.unlink(missing_ok=True)
-            with self._lock:
-                self._running = False
-                self._process = None
-                self._events.append(terminal or WorkerEvent('error', message='Tác vụ không có kết quả'))
+            cleanup_errors = []
+            try:
+                if process is not None and process.poll() is None:
+                    try:
+                        process.kill()
+                        process.wait(timeout=5)
+                    except Exception as exc:
+                        cleanup_errors.append(f'Không dừng được FFmpeg: {exc}')
+                if temp is not None:
+                    try:
+                        temp.unlink(missing_ok=True)
+                    except OSError as exc:
+                        cleanup_errors.append(f'Không xóa được file tạm {temp}: {exc}')
+            finally:
+                if cleanup_errors:
+                    previous = terminal.message if terminal else ''
+                    terminal = WorkerEvent('error', message='\n'.join([previous, *cleanup_errors]).strip(), output=terminal.output if terminal else None)
+                with self._lock:
+                    self._running = False
+                    self._process = None
+                    self._events.append(terminal or WorkerEvent('error', message='Tác vụ không có kết quả'))

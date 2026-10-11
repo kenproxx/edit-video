@@ -70,3 +70,19 @@ def test_progress_is_coalesced():
     for i in range(10000): worker._emit(WorkerEvent('progress',i/10000))
     events=worker.poll()
     assert len(events)==1 and events[0].progress==.9999
+
+
+def test_cleanup_error_always_finishes_worker(clips,tmp_path,monkeypatch):
+    source=clips['source']; target=tmp_path/'out.mp4'
+    worker=RenderWorker()
+    original=Path.unlink
+    def fail_cleanup(path,*args,**kwargs):
+        if path.name.startswith('.videoeditor-render-'):
+            raise PermissionError('locked temporary file')
+        return original(path,*args,**kwargs)
+    monkeypatch.setattr(Path,'unlink',fail_cleanup)
+    worker.start(source,probe(source),EditOptions(speed=0),reserve_output(source,target,False))
+    worker._thread.join(timeout=10)
+    assert not worker.running
+    events=worker.poll()
+    assert events[-1].kind=='error' and 'locked' in events[-1].message

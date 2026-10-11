@@ -5,6 +5,10 @@ import json
 import math
 from pathlib import Path
 import subprocess
+import os
+import tempfile
+from contextlib import contextmanager
+from PIL import Image
 from .resources import binary_path
 
 @dataclass(frozen=True)
@@ -16,6 +20,7 @@ class MediaInfo:
     has_audio: bool
     rotation: int
     is_hdr: bool
+    audio_offset: float = 0
 
 
 def _ratio(value, fallback: float) -> float:
@@ -54,7 +59,14 @@ def _parse_info(data: dict) -> MediaInfo:
     hdr = stream.get('color_transfer') in ('smpte2084', 'arib-std-b67') or stream.get('color_primaries') == 'bt2020'
     if hdr:
         raise ValueError('HDR chưa được hỗ trợ; hãy dùng video SDR')
-    return MediaInfo(w, h, duration, fps, any(s.get('codec_type') == 'audio' for s in data.get('streams', [])), rotation, False)
+    audio = next((s for s in data.get('streams', []) if s.get('codec_type') == 'audio'), None)
+    try:
+        offset = float(audio.get('start_time', 0)) - float(stream.get('start_time', 0)) if audio else 0
+        if not math.isfinite(offset):
+            raise ValueError('Nonfinite start time')
+    except (TypeError, ValueError) as exc:
+        raise ValueError('Thời điểm audio/video không hợp lệ') from exc
+    return MediaInfo(w, h, duration, fps, audio is not None, rotation, False, offset)
 
 
 def probe(path: Path) -> MediaInfo:
@@ -69,15 +81,38 @@ def normalization_filter(info: MediaInfo) -> str:
     return f'scale={info.width}:{info.height},setsar=1'
 
 
+@contextmanager
+def frame_destination(source: Path, destination: Path):
+    """An existing preview remains intact unless a fresh PNG has been validated."""
+    if source.resolve() == destination.resolve() or (destination.exists() and os.path.samefile(source, destination)):
+        raise ValueError('Ảnh preview không được ghi đè video nguồn')
+    fd, name = tempfile.mkstemp(prefix='.videoeditor-frame-', suffix='.png', dir=destination.parent)
+    os.close(fd)
+    temp = Path(name)
+    # A placeholder is not proof that FFmpeg wrote an image.
+    temp.unlink()
+    try:
+        yield temp
+        if not temp.is_file():
+            raise ValueError('Không có khung hình tại thời điểm đã chọn')
+        try:
+            with Image.open(temp) as image:
+                image.verify()
+        except OSError as exc:
+            raise ValueError('Ảnh preview không hợp lệ') from exc
+        os.replace(temp, destination)
+    finally:
+        temp.unlink(missing_ok=True)
+
+
 def extract_source_frame(path: Path, time: float, destination: Path) -> Path:
     info = probe(path)
     if not math.isfinite(time) or not 0 <= time < info.duration:
         raise ValueError('Thời điểm preview nằm ngoài video')
-    command = [str(binary_path('ffmpeg')), '-v', 'error', '-y', '-threads', '2', '-ss', str(time), '-i', str(path.resolve()), '-map', '0:v:0', '-vf', normalization_filter(info), '-frames:v', '1', '-threads', '2', str(destination.resolve())]
-    try:
-        subprocess.run(command, check=True, capture_output=True, timeout=30)
-    except (subprocess.CalledProcessError, subprocess.TimeoutExpired) as exc:
-        raise ValueError('Không trích được ảnh preview') from exc
-    if not destination.is_file():
-        raise ValueError('Không có khung hình tại thời điểm đã chọn')
+    with frame_destination(path, destination) as temp:
+        command = [str(binary_path('ffmpeg')), '-v', 'error', '-y', '-threads', '2', '-ss', str(time), '-i', str(path.resolve()), '-map', '0:v:0', '-vf', normalization_filter(info), '-frames:v', '1', '-threads', '2', str(temp.resolve())]
+        try:
+            subprocess.run(command, check=True, capture_output=True, timeout=30)
+        except (subprocess.CalledProcessError, subprocess.TimeoutExpired) as exc:
+            raise ValueError('Không trích được ảnh preview') from exc
     return destination

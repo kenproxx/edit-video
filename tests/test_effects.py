@@ -81,3 +81,56 @@ def test_rotated_preview_and_render(clips,tmp_path):
     original=image_at(clips['rotated'],.5,tmp_path,'original.png')
     rendered=image_at(out,.5,tmp_path)
     assert sum(ImageStat.Stat(ImageChops.difference(original,rendered)).mean)<12
+
+
+def test_moving_preview_uses_output_time(tmp_path,font):
+    source=tmp_path/'moving.mp4'
+    subprocess.run(['ffmpeg','-v','error','-y','-f','lavfi','-i','testsrc2=size=320x240:rate=30:duration=4','-c:v','libx264','-threads','2',str(source)],check=True)
+    options=EditOptions(speed=4,intro=TextOverlay('Đầu video',font,18,'white','black',1,10,10,1),intro_duration=.4)
+    out=export(source,options,tmp_path)
+    rendered=image_at(out,.6,tmp_path,'rendered.png')
+    preview=render_preview(source,probe(source),options,.6,tmp_path/'preview.png')
+    # CFR selects a source frame within one output-frame interval, not an exact
+    # fractional source timestamp. Still prove mapping is near .6 * 4, not .6.
+    candidates=[image_at(source,2.4+step/30,tmp_path,f'source-{step}.png') for step in (-2,-1,0,1,2)]
+    with Image.open(preview) as frame:
+        assert sum(ImageStat.Stat(ImageChops.difference(frame.convert('RGB'),rendered)).mean)<15
+        assert min(sum(ImageStat.Stat(ImageChops.difference(frame.convert('RGB'),candidate)).mean) for candidate in candidates)<15
+
+
+def test_odd_blur_region_does_not_shift(clips,tmp_path):
+    options=EditOptions(blur=Rect(41,41,57,57),blur_strength=8)
+    frame=image_at(export(clips['source'],options,tmp_path),.5,tmp_path)
+    original=image_at(clips['source'],.5,tmp_path,'base.png')
+    assert ImageStat.Stat(frame.crop((50,50,90,90))).var[0]<ImageStat.Stat(original.crop((50,50,90,90))).var[0]*.2
+
+
+def test_intro_duration_boundary(clips,tmp_path,font):
+    intro=TextOverlay('Đầu video',font,18,'white','black',1,10,130,1)
+    options=EditOptions(intro=intro,intro_duration=1)
+    out=export(clips['source'],options,tmp_path)
+    boundary=image_at(out,1,tmp_path,'boundary.png')
+    original=image_at(clips['source'],1,tmp_path,'original.png')
+    assert sum(ImageStat.Stat(ImageChops.difference(boundary,original)).mean)<4
+
+
+@pytest.mark.parametrize('speed',[1,4])
+def test_delayed_audio_stays_synchronized(tmp_path,speed):
+    import json
+    source=tmp_path/'delayed.mp4'
+    subprocess.run(['ffmpeg','-v','error','-y','-f','lavfi','-i','color=blue:size=320x240:rate=30:duration=4','-itsoffset','1','-f','lavfi','-i','sine=frequency=440:sample_rate=48000:duration=3','-c:v','libx264','-threads','2','-c:a','aac',str(source)],check=True)
+    out=export(source,EditOptions(speed=speed),tmp_path)
+    metadata=json.loads(subprocess.run(['ffprobe','-v','error','-show_streams','-of','json',str(out)],capture_output=True,check=True).stdout)
+    audio=next(s for s in metadata['streams'] if s['codec_type']=='audio')
+    assert float(audio['start_time'])==pytest.approx(1/speed,abs=.06)
+
+
+def test_no_stale_preview_at_eof(tmp_path):
+    source=tmp_path/'short.mp4'
+    subprocess.run(['ffmpeg','-v','error','-y','-f','lavfi','-i','color=blue:size=320x240:rate=30:duration=1','-c:v','libx264','-threads','2',str(source)],check=True)
+    destination=tmp_path/'preview.png'
+    Image.new('RGB',(5,5),'red').save(destination)
+    old=destination.read_bytes()
+    with pytest.raises(ValueError):
+        render_preview(source,probe(source),EditOptions(),.99,destination)
+    assert destination.read_bytes()==old

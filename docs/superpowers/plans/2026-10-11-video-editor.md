@@ -1,6 +1,6 @@
 # Video Editor Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [x]`) syntax for tracking.
 
 **Goal:** App Python chỉnh video bằng GUI và Windows EXE chạy offline, không cài dependencies riêng.
 
@@ -37,10 +37,10 @@
 
 **Interfaces:** Produces frozen dataclasses `Rect(x:int,y:int,width:int,height:int)`, `TextOverlay(text:str,font:Path,size:int,color:str,stroke_color:str,stroke_width:int,x:int,y:int,opacity:float)`, `LogoOverlay(path:Path,x:int,y:int,width:int,opacity:float)`, `EditOptions(speed:float=1,flip_horizontal:bool=False,flip_vertical:bool=False,crop:Rect|None=None,blur:Rect|None=None,blur_strength:int=10,logo:LogoOverlay|None=None,watermark:TextOverlay|None=None,intro:TextOverlay|None=None,intro_duration:float=1)`. `validate_options(options:EditOptions,width:int,height:int,duration:float)->None` raises `ValueError`; `default_output(input_path:Path,directory:Path)->Path`; `canvas_to_pixel(x:float,y:float,image_box:Rect,image_size:tuple[int,int])->tuple[int,int]|None`; `preset_crop(width:int,height:int,ratio:tuple[int,int])->Rect`.
 
-- [ ] Write parameterized tests: speed endpoints accepted/outside rejected; invalid/odd/out-of-bounds regions rejected or explicitly normalized to even encoder dimensions; intro cannot exceed duration/speed; assets/fonts checked; empty text optional; output `đầu.mov` → `đầu.mp4`; letterbox click returns None, center maps to image center; presets retain ratio and fit bounds.
-- [ ] Run `python -m pytest tests/test_models.py tests/test_geometry.py -q`; confirm failures from absent implementation.
-- [ ] Implement signatures above; pin runtime/dev dependencies compatible with Python 3.12, ignore venv/build/generated media. Keep model independent of Tk.
-- [ ] Run same tests; all cases pass. Commit `feat: add edit configuration and geometry validation`.
+- [x] Write parameterized tests: speed endpoints accepted/outside rejected; invalid/odd/out-of-bounds regions rejected or explicitly normalized to even encoder dimensions; intro cannot exceed duration/speed; assets/fonts checked; empty text optional; output `đầu.mov` → `đầu.mp4`; letterbox click returns None, center maps to image center; presets retain ratio and fit bounds.
+- [x] Run `python -m pytest tests/test_models.py tests/test_geometry.py -q`; confirm failures from absent implementation.
+- [x] Implement signatures above; pin runtime/dev dependencies compatible with Python 3.12, ignore venv/build/generated media. Keep model independent of Tk.
+- [x] Run same tests; all cases pass. Commit `feat: add edit configuration and geometry validation`.
 
 ### Task 2: Binaries, probe và orientation
 
@@ -48,10 +48,10 @@
 
 **Interfaces:** Consumes Rect. Produces `MediaInfo(width:int,height:int,duration:float,fps:float,has_audio:bool,rotation:int,is_hdr:bool)`, `binary_path(name:str)->Path`, `user_data_dir()->Path`, `probe(path:Path)->MediaInfo`, `extract_source_frame(path:Path,time:float,destination:Path)->Path`. Width/height are display-oriented square pixels. Renderer must use the same FFmpeg autorotation/SAR normalization and metadata policy as probe.
 
-- [ ] Create FFmpeg synthetic SDR fixtures with colored quadrants, sine audio, silent version, rotation metadata, non-square SAR, HDR metadata and malformed file. Assert display dimensions/rotation, fps fallback, audio detection, HDR rejection before rendering and frame corner orientation.
-- [ ] Run `python -m pytest tests/test_media.py -q`; confirm meaningful failures (missing tools is prerequisite failure, not success/skip).
-- [ ] Implement probe via ffprobe JSON with timeout and useful errors, binary lookup preferring bundled `tools/` under frozen resource root. Setup dev venv and system FFmpeg with supported package tools; never disable verification. Use inherited cloud network/CA settings.
-- [ ] Run tests with real FFmpeg; record fixture counts and commit `feat: probe media and normalize preview orientation`.
+- [x] Create FFmpeg synthetic SDR fixtures with colored quadrants, sine audio, silent version, rotation metadata, non-square SAR, HDR metadata and malformed file. Assert display dimensions/rotation, fps fallback, audio detection, HDR rejection before rendering and frame corner orientation.
+- [x] Run `python -m pytest tests/test_media.py -q`; confirm meaningful failures (missing tools is prerequisite failure, not success/skip).
+- [x] Implement probe via ffprobe JSON with timeout and useful errors, binary lookup preferring bundled `tools/` under frozen resource root. Setup dev venv and system FFmpeg with supported package tools; never disable verification. Use inherited cloud network/CA settings.
+- [x] Run tests with real FFmpeg; record fixture counts and commit `feat: probe media and normalize preview orientation`.
 
 ### Task 3: Filter graph và preview
 
@@ -59,10 +59,10 @@
 
 **Interfaces:** Consumes task 1/2 types. Produces `PreparedRender(args:list[str],duration:float)`, `prepare_render(source:Path,info:MediaInfo,options:EditOptions,destination:Path,workspace:Path)->PreparedRender`, `render_preview(source:Path,info:MediaInfo,options:EditOptions,time:float,destination:Path)->Path`. Time is output timeline. Workspace owns generated overlays; preview uses the same filter builder, retains source temporal mapping and returns post-edit image.
 
-- [ ] Write unit tests asserting filter order, atempo chaining for 0.25/4, optional audio mapping and exact encoding settings. Integration tests assert duration within one output frame plus audio encoder tolerance; preserved sine pitch within 2%; crop dimensions and quadrant flip; blur reduces local variance without changing distant region; logo alpha blend; Vietnamese multiline text visible at 0.5s and absent after intro duration. Test Unicode/quotes/colon filenames and text, silent clip and preview frame matching decoded render within lossy tolerance.
-- [ ] Run `python -m pytest tests/test_filters.py tests/test_effects.py -q`; verify failures before implementation.
-- [ ] Implement rasterized text PNG with Pillow, logo scaling/opacity, fixed blur filter, timestamps and encoding. Pass subprocess args as lists; use safe temporary relative names for filter assets and no user strings embedded in graph. Strip output rotation/subtitle/private metadata. Validate before spawning.
-- [ ] Run tests with actual outputs inspected via ffprobe/frame sampling/audio analysis; commit `feat: render video edits and matching previews`.
+- [x] Write unit tests asserting filter order, atempo chaining for 0.25/4, optional audio mapping and exact encoding settings. Integration tests assert duration within one output frame plus audio encoder tolerance; preserved sine pitch within 2%; crop dimensions and quadrant flip; blur reduces local variance without changing distant region; logo alpha blend; Vietnamese multiline text visible at 0.5s and absent after intro duration. Test Unicode/quotes/colon filenames and text, silent clip and preview frame matching decoded render within lossy tolerance.
+- [x] Run `python -m pytest tests/test_filters.py tests/test_effects.py -q`; verify failures before implementation.
+- [x] Implement rasterized text PNG with Pillow, logo scaling/opacity, fixed blur filter, timestamps and encoding. Pass subprocess args as lists; use safe temporary relative names for filter assets and no user strings embedded in graph. Strip output rotation/subtitle/private metadata. Validate before spawning.
+- [x] Run tests with actual outputs inspected via ffprobe/frame sampling/audio analysis; commit `feat: render video edits and matching previews`.
 
 ### Task 4: Xuất an toàn và worker
 
@@ -70,10 +70,10 @@
 
 **Interfaces:** Consumes prepare_render. Produces `OutputReservation` capturing destination identity/existence and overwrite consent; `reserve_output(source:Path,destination:Path,overwrite:bool)->OutputReservation`; `RenderWorker.start(source:Path,info:MediaInfo,options:EditOptions,reservation:OutputReservation)->None`, `.cancel()->None`, `.poll()->list[WorkerEvent]`, `.running:bool`; `WorkerEvent(kind:str,progress:float|None=None,message:str='',output:Path|None=None)`. Kinds progress/completed/cancelled/error. Output helper publishes only against unchanged reservation; use supported atomic commit/locking rather than treating a non-atomic existence check as race protection.
 
-- [ ] Tests reject source aliases (resolved path, Windows case, symlink/hardlink where available), require overwrite consent, preserve existing bytes after encoder failure/hủy. Inject destination appearing/changing during render; assert conflict preserves it. Verify actual cancellation terminates FFmpeg, cleanup removes only job files, one job maximum and progress event memory bounded under flood.
-- [ ] Run `python -m pytest tests/test_output.py tests/test_worker.py -q`; verify failures.
-- [ ] Implement same-directory unique MP4 temp, destination reservation and safe publish, bounded progress coalescing, stderr diagnostic tail/log and termination timeout. Use runtime user directory for overlays/log, output directory for video temp. Report permission/space/process errors distinctly.
-- [ ] Run tests plus phase 2 full `python -m pytest -q`; commit `feat: export safely with cancellable background worker`. Report phase 2 evidence.
+- [x] Tests reject source aliases (resolved path, Windows case, symlink/hardlink where available), require overwrite consent, preserve existing bytes after encoder failure/hủy. Inject destination appearing/changing during render; assert conflict preserves it. Verify actual cancellation terminates FFmpeg, cleanup removes only job files, one job maximum and progress event memory bounded under flood.
+- [x] Run `python -m pytest tests/test_output.py tests/test_worker.py -q`; verify failures.
+- [x] Implement same-directory unique MP4 temp, destination reservation and safe publish, bounded progress coalescing, stderr diagnostic tail/log and termination timeout. Use runtime user directory for overlays/log, output directory for video temp. Report permission/space/process errors distinctly.
+- [x] Run tests plus phase 2 full `python -m pytest -q`; commit `feat: export safely with cancellable background worker`. Report phase 2 evidence.
 
 ## Phase 3 — GUI
 
@@ -106,3 +106,7 @@
 ## Execution handoff
 
 Khuyến nghị Native: một agent triển khai theo thứ tự vì GUI/worker/build dùng chung nhiều interface, giảm context và token. Cuối nhánh có reviewer độc lập. Phương án Subagent-driven có implementer/reviewer mới mỗi task, kiểm tra độc lập sớm hơn nhưng tốn token hơn. Chờ người dùng duyệt kế hoạch và chọn phương pháp trước code.
+
+## Phase 2 execution record
+
+Tasks 1–4 completed; see `docs/phase-2-report.md` for tests, review fixes and platform limitations. `MediaInfo` now adds optional `audio_offset: float = 0` to preserve stream synchronization; existing constructors remain compatible. Preview/export share explicit CFR sampling. User requires a stop after this phase; task 5 is not authorized until the next request.

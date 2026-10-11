@@ -45,7 +45,7 @@ def test_conflict_at_atomic_publish_preserves_new_file(tmp_path,monkeypatch):
     temp=tmp_path/'temp.mp4'; temp.write_bytes(b'new')
     original_link=os.link
     def create_conflict(src,dst,*args,**kwargs):
-        if Path(src)==temp:
+        if Path(src)==temp and Path(dst)==target:
             target.write_bytes(b'new external file')
         return original_link(src,dst,*args,**kwargs)
     monkeypatch.setattr(os,'link',create_conflict)
@@ -59,3 +59,52 @@ def test_invalid_name_and_missing_folder(tmp_path):
     source=tmp_path/'in.mp4'; source.write_bytes(b'x')
     for target in [tmp_path/'missing'/'out.mp4',tmp_path/'out.mkv']:
         with pytest.raises(ValueError): reserve_output(source,target,False)
+
+
+def test_publish_failure_restores_old_target(tmp_path,monkeypatch):
+    source=tmp_path/'in.mp4'; source.write_bytes(b'input')
+    target=tmp_path/'out.mp4'; target.write_bytes(b'old')
+    temp=tmp_path/'temp.mp4'; temp.write_bytes(b'new')
+    reservation=reserve_output(source,target,True)
+    original=os.link
+    def unsupported(src,dst):
+        if Path(src)==temp: raise OSError('Filesystem does not support links')
+        return original(src,dst)
+    monkeypatch.setattr(os,'link',unsupported)
+    with pytest.raises(OSError): publish_output(temp,reservation)
+    assert target.read_bytes()==b'old'
+    assert not list(tmp_path.glob('.videoeditor-*'))
+
+
+def test_changed_during_backup_move_is_restored(tmp_path,monkeypatch):
+    source=tmp_path/'in.mp4'; source.write_bytes(b'input')
+    target=tmp_path/'out.mp4'; target.write_bytes(b'old')
+    temp=tmp_path/'temp.mp4'; temp.write_bytes(b'new')
+    reservation=reserve_output(source,target,True)
+    original=os.replace
+    def replace_with_conflict(src,dst):
+        target.write_bytes(b'changed in race')
+        return original(src,dst)
+    monkeypatch.setattr(os,'replace',replace_with_conflict)
+    with pytest.raises(FileExistsError): publish_output(temp,reservation)
+    assert target.read_bytes()==b'changed in race'
+    assert not list(tmp_path.glob('.videoeditor-*'))
+
+
+def test_unsupported_hardlinks_fail_without_moving_destination(tmp_path,monkeypatch):
+    source=tmp_path/'in.mp4'; source.write_bytes(b'input')
+    target=tmp_path/'out.mp4'; target.write_bytes(b'old')
+    temp=tmp_path/'temp.mp4'; temp.write_bytes(b'new')
+    reservation=reserve_output(source,target,True)
+    def unsupported(*args,**kwargs):
+        import errno
+        raise OSError(errno.EOPNOTSUPP,'No hardlinks')
+    monkeypatch.setattr(os,'link',unsupported)
+    # A safe implementation may use another atomic no-replace operation.
+    try:
+        publish_output(temp,reservation)
+    except OSError:
+        assert target.read_bytes()==b'old'
+    else:
+        assert target.read_bytes()==b'new'
+    assert not list(tmp_path.glob('.videoeditor-*'))

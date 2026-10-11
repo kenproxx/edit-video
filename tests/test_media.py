@@ -59,3 +59,27 @@ def test_resources(tmp_path,monkeypatch):
 def test_negative_frame_time(clips,tmp_path):
     with pytest.raises(ValueError):
         extract_source_frame(clips['source'],-1,tmp_path/'no.png')
+
+
+def test_combined_rotation_and_sar(clips,tmp_path):
+    import subprocess
+    path=tmp_path/'rotated-sar.mp4'
+    subprocess.run(['ffmpeg','-v','error','-y','-display_rotation','90','-i',str(clips['sar']),'-c','copy',str(path)],check=True)
+    info=probe(path)
+    assert (info.width,info.height)==(240,640)
+    with Image.open(extract_source_frame(path,.5,tmp_path/'combined.png')) as image:
+        assert image.size==(240,640)
+        r,g,b=image.getpixel((15,15))[:3]
+        assert g>r and g>b
+
+
+def test_no_stale_source_frame_at_eof(tmp_path):
+    import subprocess
+    source=tmp_path/'short.mp4'
+    subprocess.run(['ffmpeg','-v','error','-y','-f','lavfi','-i','color=blue:size=320x240:rate=30:duration=1','-c:v','libx264','-threads','2',str(source)],check=True)
+    destination=tmp_path/'frame.png'
+    Image.new('RGB',(5,5),'red').save(destination)
+    old=destination.read_bytes()
+    with pytest.raises(ValueError):
+        extract_source_frame(source,.99,destination)
+    assert destination.read_bytes()==old

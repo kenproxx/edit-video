@@ -12,6 +12,7 @@ import os
 from pathlib import Path
 import stat
 import tempfile
+import uuid
 
 Fingerprint = tuple[int, int, int, int]
 
@@ -79,7 +80,10 @@ def publish_output(temp: Path, reservation: OutputReservation) -> Path:
     fd = os.open(lock, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
     backup = None
     moved = False
+    trial = target.parent / f".videoeditor-linkcheck-{uuid.uuid4().hex}"
     try:
+        # Prove filesystem support before disturbing a confirmed old destination.
+        os.link(temp, trial)
         if _fingerprint(target) != reservation.expected:
             raise FileExistsError('File đích đã thay đổi sau khi xác nhận')
         if reservation.expected is not None:
@@ -110,5 +114,6 @@ def publish_output(temp: Path, reservation: OutputReservation) -> Path:
     finally:
         if backup is not None and not moved:
             backup.unlink(missing_ok=True)
+        trial.unlink(missing_ok=True)
         os.close(fd)
         lock.unlink(missing_ok=True)
