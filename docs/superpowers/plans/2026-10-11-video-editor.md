@@ -6,7 +6,7 @@
 
 **Architecture:** CustomTkinter dùng model cấu hình chung cho preview và render FFmpeg. Worker nền giao tiếp bằng event queue; bootstrap Windows chuẩn bị Python và binaries rồi đóng gói PyInstaller.
 
-**Tech Stack:** Python 3.12, CustomTkinter, Pillow, FFmpeg/ffprobe, pytest, PyInstaller; khóa phiên bản cụ thể trong task liên quan.
+**Tech Stack:** Python 3.12 (Linux dev), Python 3.13.12 (Windows bootstrap), CustomTkinter, Pillow, FFmpeg/ffprobe, pytest, PyInstaller; khóa phiên bản cụ thể trong task liên quan.
 
 **Spec:** `docs/superpowers/specs/2026-10-11-video-editor-design.md`
 
@@ -96,12 +96,13 @@
 
 **Interfaces:** Entry points build.bat/build.sh → bootstrap-build.ps1 → isolated Python/build dependencies → PyInstaller → `dist/VideoEditor.exe`. Manifest pins Python installer and Windows FFmpeg archive versions, official URLs and authoritative checksums; manifest is non-secret. `main.py --smoke-test INPUT --output-dir DIR` exercises probe/render without opening GUI, then exits nonzero on failure; default launch opens GUI.
 
-- [ ] Write packaging tests for frozen resource lookup, missing/corrupt tools, user resource location when install directory is read-only, explicit non-Windows rejection and startup without pip. Windows bootstrap negative test tampers cached download and expects hash rejection. Packaged smoke asserts output codec/duration and runs GUI startup/close separately.
-- [ ] Run `python -m pytest tests/test_packaging.py -q`; verify red tests. Obtain version/hash/license metadata from authoritative release sources; do not invent checksums or bypass blocked domains.
-- [ ] Implement signed Python per-user private bootstrap when matching Python unavailable, venv installation and integrity-verified FFmpeg/ffprobe bundle (libx264/AAC, required filters). Build script must fail on every failed download/install/build; repeat invocation reuses only verified artifacts. Include CustomTkinter resources and distribution licenses. build.sh requires Windows Git Bash and invokes PowerShell, reports Linux limitation explicitly. Add Windows CI artifact build/smoke without release publishing.
-- [ ] Document offline EXE usage, source setup, effects coordinates/preview limitations, build commands, third-party licenses and phase validation. Do not claim unfinished platform tests passed.
+- [x] Write packaging tests for frozen resource lookup, missing/corrupt tools, user resource location when install directory is read-only, explicit non-Windows rejection and startup without pip. Windows bootstrap negative test tampers cached download and expects hash rejection. Packaged smoke asserts output codec/duration and runs GUI startup/close separately.
+- [x] Run `python -m pytest tests/test_packaging.py -q`; verify red tests. Obtain version/hash/license metadata from authoritative release sources; do not invent checksums or bypass blocked domains.
+- [x] Implement signed Python per-user private bootstrap when matching Python unavailable, venv installation and integrity-verified FFmpeg/ffprobe bundle (libx264/AAC, required filters). Build script must fail on every failed download/install/build; repeat invocation reuses only verified artifacts. Include CustomTkinter resources and distribution licenses. build.sh requires Windows Git Bash and invokes PowerShell, reports Linux limitation explicitly. Add Windows CI artifact build/smoke without release publishing.
+- [x] Document offline EXE usage, source setup, effects coordinates/preview limitations, build commands, third-party licenses and phase validation. Do not claim unfinished platform tests passed.
 - [ ] Run Linux full suite. On Windows without Python/FFmpeg on PATH run bootstrap twice; verify both builds, run EXE smoke with restricted PATH, Unicode paths and read-only app directory, launch GUI and export synthetic fixture. Inspect bundled licenses. If Windows executor unavailable, report Windows build/EXE checks unrun and keep that deliverable pending; do not substitute Linux PyInstaller output.
-- [ ] Commit `build: bootstrap and package standalone Windows editor`; report final test counts, EXE location if actually built, and remaining platform limitations. Obtain whole-branch review using selected execution method before declaring implementation complete.
+- [x] Commit `build: bootstrap and package standalone Windows editor`; report final test counts, EXE location if actually built, and remaining platform limitations. Obtain whole-branch review using selected execution method before declaring implementation complete.
+
 
 ## Execution handoff
 
@@ -114,3 +115,7 @@ Tasks 1–4 completed; see `docs/phase-2-report.md` for tests, review fixes and 
 ## Phase 3 execution record
 
 Task 5 completed with Vietnamese GUI, cancellable preview/probe and review fixes. See `docs/phase-3-report.md`. Phase 4 remains pending until the user requests it.
+
+## Phase 4 execution record
+
+Bootstrap/spec/CLI/CI and documentation implemented; Linux tests and whole-branch review recorded in `docs/phase-4-report.md`. Windows acceptance and the built EXE remain pending because no Windows executor is available. Complete matching FFmpeg corresponding source is also pending before public redistribution. Keep task 6 platform acceptance unchecked; do not call the complete Windows deliverable validated.

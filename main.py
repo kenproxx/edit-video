@@ -15,7 +15,16 @@ def main(argv=None) -> int:
     args = parser.parse_args(argv)
     if args.smoke_test is not None and args.output_dir is None: parser.error('--smoke-test requires --output-dir')
     if args.smoke_test is not None or args.gui_smoke_test:
+        report = None
         try:
+            if args.report is not None:
+                if args.smoke_test is not None:
+                    output = args.output_dir / (args.smoke_test.stem + '.mp4')
+                    if args.report.resolve() == output.resolve():
+                        raise ValueError('Report không được trùng file video đầu ra')
+                # Reserve before any work; exclusive creation protects input,
+                # existing reports, symlinks and concurrent file creation.
+                report = args.report.open('x',encoding='utf-8')
             if args.smoke_test is not None:
                 from app.selftest import smoke_export
                 result = smoke_export(args.smoke_test,args.output_dir)
@@ -30,8 +39,9 @@ def main(argv=None) -> int:
             result = {'ok':False,'error':str(exc)}
             code = 1
         text = json.dumps(result,ensure_ascii=False,indent=2)
-        if args.report is not None:
-            args.report.write_text(text+'\n',encoding='utf-8')
+        if report is not None:
+            with report:
+                report.write(text+'\n')
         if sys.stdout is not None: print(text)
         return code
     from app.ui import VideoEditorApp

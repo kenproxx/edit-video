@@ -1,6 +1,6 @@
 # Video Editor
 
-App desktop Python để chỉnh một video và xuất MP4 mới. **Phase 3: đã có GUI và engine; Windows EXE/script build tự chuẩn bị dependencies thuộc phase 4, chưa có ở bản này.**
+App desktop Python để chỉnh một video và xuất MP4 mới. **Đã có GUI, engine và script build Windows. Cloud hiện tại là Linux: chưa tạo hoặc xác thực Windows EXE; cần chạy workflow Windows hoặc build trên Windows.**
 
 ## Chức năng
 
@@ -11,6 +11,24 @@ App desktop Python để chỉnh một video và xuất MP4 mới. **Phase 3: đ
 - Chữ tiếng Việt nhiều dòng trên đầu video, thời gian hiển thị chỉnh được.
 - Preview bằng ảnh ở thời điểm chọn, tiến trình/hủy xuất; bảo vệ video nguồn.
 
+## Build Windows EXE
+
+Trên **Windows 10/11 x64**, tải/clone source rồi chạy `build.bat`. Nếu dùng Git Bash:
+
+```bash
+./build.sh
+```
+
+Không cần cài Python, FFmpeg hoặc package Python riêng. Bootstrap PowerShell tìm Python 3.13.12 x64 phù hợp; nếu chưa có thì tải installer chính thức, kiểm tra SHA-256 và chữ ký Python Software Foundation, cài riêng cho build không thêm PATH/launcher. Script tạo venv mới, cài các wheel đã khóa phiên bản/hash, tải ZIP FFmpeg 8.1.2 đã kiểm tra hash và chạy PyInstaller. Thất bại ở bất kỳ bước nào sẽ dừng build.
+
+Kết quả dự kiến: `dist/VideoEditor.exe`, SHA-256 và thư mục giấy phép. Chạy EXE offline, không cài dependencies khi mở app. Chạy build cần mạng tới `www.python.org`, `github.com` và host release assets, `pypi.org`, `files.pythonhosted.org`. Linux/macOS được báo không hỗ trợ build Windows EXE.
+
+Cache ở `.build-cache/` và được kiểm tra trước khi dùng archive; venv được tạo lại mỗi lần. Nếu cache sai hash, script báo file lỗi và dừng; xóa đúng file đó để tải lại. Build dùng PowerShell x64 có sẵn trên Windows; `build.sh` cần Git Bash.
+
+Workflow [Windows standalone editor](.github/workflows/windows-build.yml) chuẩn bị build khi PATH không cung cấp Python/FFmpeg, build lại, kiểm tra cache bị sửa, rồi chạy chính EXE với PATH giới hạn, đường dẫn tiếng Việt, thư mục app chỉ đọc và GUI startup/close. Artifact chỉ được upload nếu những bước đó qua; workflow chưa được chạy trong phiên cloud này. Không tự push hoặc publish release.
+
+Trước khi phân phối bản chứa FFmpeg GPL, bổ sung complete corresponding source của static build; xem [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md). Giấy phép đi kèm hiện không thay thế source bundle còn thiếu.
+
 ## Chạy source để phát triển
 
 Python 3.12 có Tk, FFmpeg/ffprobe. Trên Linux:
@@ -20,7 +38,7 @@ Python 3.12 có Tk, FFmpeg/ffprobe. Trên Linux:
 .venv/bin/python main.py
 ```
 
-GUI cần màn hình thật hoặc Xvfb. Bản đóng gói cuối dành cho Windows 10/11 x64 sẽ chứa dependencies; hướng dẫn source này dành cho phát triển, không phải yêu cầu cài riêng cho người dùng EXE.
+GUI cần màn hình thật hoặc Xvfb. Bản đóng gói dành cho Windows 10/11 x64 chứa dependencies; hướng dẫn source này dành cho phát triển. Python build Windows 3.13.12 được khóa riêng, còn môi trường source Linux đã kiểm chứng dùng 3.12.
 
 ## Cách dùng
 
@@ -49,4 +67,16 @@ PATH="/tmp/edit-video-display-root/usr/bin:$PATH" \
 /tmp/edit-video-display-root/usr/bin/xvfb-run -a .venv/bin/python -m pytest -q
 ```
 
-Xem [báo cáo phase 2](docs/phase-2-report.md), [báo cáo phase 3](docs/phase-3-report.md), [đặc tả](docs/superpowers/specs/2026-10-11-video-editor-design.md) và [kế hoạch](docs/superpowers/plans/2026-10-11-video-editor.md). Kiểm chứng Windows và build EXE sẽ báo riêng ở phase 4.
+Để kiểm chứng EXE sau build trên Windows:
+
+```powershell
+.build-cache\venv\Scripts\python.exe scripts/smoke-packaged.py --exe dist/VideoEditor.exe --ffmpeg tools/ffmpeg.exe
+```
+
+CLI headless cũng chạy từ source (thư mục output và thư mục cha của report phải có sẵn; file report phải chưa tồn tại):
+
+```bash
+.venv/bin/python main.py --smoke-test input.mp4 --output-dir output --report report.json
+```
+
+Xem [báo cáo phase 2](docs/phase-2-report.md), [báo cáo phase 3](docs/phase-3-report.md), [báo cáo phase 4](docs/phase-4-report.md), [đặc tả](docs/superpowers/specs/2026-10-11-video-editor-design.md) và [kế hoạch](docs/superpowers/plans/2026-10-11-video-editor.md). Kiểm chứng Windows/EXE và source bundle FFmpeg vẫn còn chờ.

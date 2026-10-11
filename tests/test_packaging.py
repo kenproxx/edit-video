@@ -118,3 +118,27 @@ def test_gui_smoke_reports_native_startup_and_close(tmp_path):
     result=subprocess.run([sys.executable,str(ROOT/'main.py'),'--gui-smoke-test','--report',str(report)],capture_output=True,text=True,timeout=20)
     assert result.returncode==0,result.stderr
     assert json.loads(report.read_text(encoding='utf-8'))=={'ok':True,'gui':True}
+
+
+def test_smoke_report_cannot_overwrite_input(clips,tmp_path):
+    source=tmp_path/'clip.mp4';source.write_bytes(clips['silent'].read_bytes())
+    original=source.read_bytes()
+    result=subprocess.run([sys.executable,str(ROOT/'main.py'),'--smoke-test',str(source),'--output-dir',str(tmp_path),'--report',str(source)],capture_output=True,text=True,timeout=30)
+    assert result.returncode!=0
+    assert source.read_bytes()==original
+
+
+def test_smoke_report_cannot_replace_existing_file(clips,tmp_path):
+    source=tmp_path/'clip.mp4';source.write_bytes(clips['silent'].read_bytes())
+    report=tmp_path/'existing.json';report.write_bytes(b'keep existing report')
+    result=subprocess.run([sys.executable,str(ROOT/'main.py'),'--smoke-test',str(source),'--output-dir',str(tmp_path),'--report',str(report)],capture_output=True,text=True,timeout=30)
+    assert result.returncode!=0
+    assert report.read_bytes()==b'keep existing report'
+
+
+def test_smoke_report_cannot_take_output_name(clips,tmp_path):
+    source=tmp_path/'clip.mp4';source.write_bytes(clips['silent'].read_bytes())
+    output=tmp_path/'export';output.mkdir()
+    result=subprocess.run([sys.executable,str(ROOT/'main.py'),'--smoke-test',str(source),'--output-dir',str(output),'--report',str(output/source.name)],capture_output=True,text=True,timeout=30)
+    assert result.returncode!=0
+    assert not (output/source.name).exists()
