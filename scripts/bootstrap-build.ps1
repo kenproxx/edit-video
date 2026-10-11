@@ -1,8 +1,8 @@
 # Downloads are pinned and verified before execution or extraction.
 [CmdletBinding()]
 param(
-    [string]$CacheDir = (Join-Path $PSScriptRoot '..\.build-cache'),
-    [string]$ManifestPath = (Join-Path $PSScriptRoot 'build-manifest.json'),
+    [string]$CacheDir,
+    [string]$ManifestPath,
     [switch]$VerifyCache
 )
 Set-StrictMode -Version 2.0
@@ -48,6 +48,18 @@ function Test-Python([string]$Program, [string]$Version) {
 }
 
 try {
+    # Resolve defaults after parameter binding: PSScriptRoot may be empty
+    # while Windows PowerShell evaluates default parameter expressions.
+    $scriptDir = $PSScriptRoot
+    if ([string]::IsNullOrEmpty($scriptDir)) {
+        $scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
+    }
+    if ([string]::IsNullOrEmpty($CacheDir)) {
+        $CacheDir = Join-Path $scriptDir '..\.build-cache'
+    }
+    if ([string]::IsNullOrEmpty($ManifestPath)) {
+        $ManifestPath = Join-Path $scriptDir 'build-manifest.json'
+    }
     $manifest = Get-Content -LiteralPath $ManifestPath -Raw | ConvertFrom-Json
     if ($manifest.schema_version -ne 1) { throw 'Unsupported build manifest schema' }
     if ($VerifyCache) {
@@ -63,7 +75,7 @@ try {
     if ([Environment]::OSVersion.Platform -ne 'Win32NT' -or -not [Environment]::Is64BitProcess -or $env:PROCESSOR_ARCHITECTURE -ne 'AMD64') {
         throw 'Build requires Windows x64 (PowerShell x64); Linux cross-build is unsupported.'
     }
-    $root = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))
+    $root = [IO.Path]::GetFullPath((Join-Path $scriptDir '..'))
     $CacheDir = [IO.Path]::GetFullPath($CacheDir)
     New-Item -ItemType Directory -Path $CacheDir -Force | Out-Null
     $pythonHome = Join-Path $CacheDir "python-$($manifest.python.version)"

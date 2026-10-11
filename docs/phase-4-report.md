@@ -48,3 +48,11 @@ Windows PowerShell 5.1, installer/Authenticode, Windows PyInstaller/EXE/GUI/ACL 
 Đã giữ nhánh `work` và checkout hiện tại theo yêu cầu commit/báo cáo từng phase; không merge/push. Ledger được giữ vì acceptance Windows còn pending. Kết quả suite cuối sau sửa ghi bên dưới.
 
 Kết quả cuối sau review fix: **105 passed in 73.50s**, full suite có GUI thật và PowerShell cache tests, không skip/warning pytest. Ba regression report RED→GREEN; `git diff --check` sạch. Đây là kiểm chứng Linux/source và logic bootstrap khả dụng, không phải bằng chứng đã tạo hoặc chạy Windows EXE.
+
+## Sửa lỗi bootstrap khi chạy từ Windows PowerShell
+
+Sau merge, người dùng báo `Join-Path ... Path ... empty string` ngay khi mở `build.sh`/`build.bat`. Giá trị mặc định của `CacheDir`/`ManifestPath` gọi `Join-Path $PSScriptRoot` trong `param()`, khi script root chưa được gán trong ngữ cảnh bind tham số đó. Đã bỏ phép tính khỏi `param()`, xác định script directory trong thân script (fallback qua `MyInvocation.MyCommand.Path`), rồi mới gán các đường dẫn mặc định. Hai launcher dùng chung bootstrap nên cùng nhận bản sửa.
+
+Regression thực thi chính param block của production với script root rỗng: RED lỗi `Join-Path`, GREEN sau sửa. Test thứ hai chạy bản sao script ở đường dẫn Unicode/khoảng trắng từ cwd khác, xác nhận default manifest/cache thuộc project và không tạo file ở cwd. Hai test chạy qua trên PowerShell 7 Linux; không thay thế kiểm chứng toàn bộ installer/EXE Windows.
+
+Full suite sau bản sửa bootstrap: **107 passed in 36.67s**, không skip. Kiểm chứng dùng Python 3.13/Tk8.6 hệ thống, virtual display Xvfb và PowerShell 7 trên Linux.

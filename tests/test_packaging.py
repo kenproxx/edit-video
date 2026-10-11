@@ -142,3 +142,33 @@ def test_smoke_report_cannot_take_output_name(clips,tmp_path):
     result=subprocess.run([sys.executable,str(ROOT/'main.py'),'--smoke-test',str(source),'--output-dir',str(output),'--report',str(output/source.name)],capture_output=True,text=True,timeout=30)
     assert result.returncode!=0
     assert not (output/source.name).exists()
+
+
+def test_bootstrap_parameter_binding_does_not_require_script_root(tmp_path):
+    # Windows PowerShell can bind default parameters before PSScriptRoot is set.
+    # Execute the real param block with an unset root, not a rewritten stand-in.
+    script=tmp_path/'binding.ps1'
+    script.write_text('''$ErrorActionPreference = 'Stop'
+$tokens = $null; $errors = $null
+$ast = [System.Management.Automation.Language.Parser]::ParseFile($args[0], [ref]$tokens, [ref]$errors)
+$PSScriptRoot = ''
+& ([scriptblock]::Create($ast.ParamBlock.Extent.Text + "`nWrite-Output 'BOUND'"))
+''',encoding='utf-8')
+    result=subprocess.run([pwsh(),'-NoProfile','-File',str(script),str(ROOT/'scripts/bootstrap-build.ps1')],capture_output=True,text=True,timeout=20)
+    assert result.returncode==0,result.stderr
+    assert 'BOUND' in result.stdout
+
+
+def test_bootstrap_default_paths_are_relative_to_script_not_cwd(tmp_path):
+    import hashlib
+    project=tmp_path/'dự án build';scripts=project/'scripts';scripts.mkdir(parents=True)
+    shutil.copy2(ROOT/'scripts/bootstrap-build.ps1',scripts/'bootstrap-build.ps1')
+    cache=project/'.build-cache';cache.mkdir()
+    content=b'verified default-cache artifact';(cache/'artifact.zip').write_bytes(content)
+    artifact={'filename':'artifact.zip','sha256':hashlib.sha256(content).hexdigest()}
+    (scripts/'build-manifest.json').write_text(json.dumps({'schema_version':1,'python':artifact,'ffmpeg':artifact}))
+    other=tmp_path/'unrelated';other.mkdir()
+    result=subprocess.run([pwsh(),'-NoProfile','-File',str(scripts/'bootstrap-build.ps1'),'-VerifyCache'],capture_output=True,text=True,timeout=20,cwd=other)
+    assert result.returncode==0,result.stderr
+    assert 'Verified 2' in result.stdout
+    assert not list(other.iterdir())
