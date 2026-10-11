@@ -1,0 +1,21 @@
+{
+  "schema_version": 1,
+  "python": {
+    "version": "3.13.12",
+    "filename": "python-3.13.12-amd64.exe",
+    "url": "https://www.python.org/ftp/python/3.13.12/python-3.13.12-amd64.exe",
+    "sha256": "96159fcb523ae404b707186a75b4104ee23851e476a5e838e14584cf1e03f981",
+    "checksum_source": "https://raw.githubusercontent.com/microsoft/winget-pkgs/master/manifests/p/Python/Python/3/13/3.13.12/Python.Python.3.13.installer.yaml",
+    "signer": "Python Software Foundation"
+  },
+  "ffmpeg": {
+    "version": "8.1.2",
+    "filename": "ffmpeg-8.1.2-essentials_build.zip",
+    "url": "https://github.com/GyanD/codexffmpeg/releases/download/8.1.2/ffmpeg-8.1.2-essentials_build.zip",
+    "sha256": "db580001caa24ac104c8cb856cd113a87b0a443f7bdf47d8c12b1d740584a2ec",
+    "checksum_source": "https://github.com/GyanD/codexffmpeg/releases/expanded_assets/8.1.2",
+    "archive_root": "ffmpeg-8.1.2-essentials_build",
+    "license": "GPL-3.0-or-later",
+    "source": "https://github.com/FFmpeg/FFmpeg/commit/38b88335f9"
+  }
+}
