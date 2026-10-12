@@ -57,7 +57,7 @@ def main():
         # Exercise mixed export with independently measurable source/insert levels.
         mixed_dir=root/'trộn âm thanh';mixed_dir.mkdir(exist_ok=True)
         mix_report=root/'mix.json'
-        run([exe,'--smoke-test',source,'--audio-file',audio,'--source-volume','25','--added-volume','60','--output-dir',mixed_dir,'--report',mix_report],env=restricted,cwd=app_dir)
+        run([exe,'--smoke-test',source,'--audio-file',audio,'--source-volume','25','--added-volume','60','--audio-loop','--output-dir',mixed_dir,'--report',mix_report],env=restricted,cwd=app_dir)
         mixed=json.loads(mix_report.read_text(encoding='utf-8'))
         assert mixed['ok'] and mixed['audio_codec']=='aac',mixed
         from array import array
@@ -75,7 +75,7 @@ def main():
         run([args.ffmpeg.resolve(),'-v','error','-y','-f','lavfi','-i','aevalsrc=0.1*sin(2*PI*880*t)|-0.1*sin(2*PI*880*t):s=48000:d=0.4',stereo])
         stereo_dir=root/'stereo';stereo_dir.mkdir(exist_ok=True)
         stereo_report=root/'stereo.json'
-        run([exe,'--smoke-test',source,'--audio-file',stereo,'--source-volume','0','--added-volume','50','--output-dir',stereo_dir,'--report',stereo_report],env=restricted,cwd=app_dir)
+        run([exe,'--smoke-test',source,'--audio-file',stereo,'--source-volume','0','--added-volume','50','--audio-loop','--output-dir',stereo_dir,'--report',stereo_report],env=restricted,cwd=app_dir)
         stereo_result=json.loads(stereo_report.read_text(encoding='utf-8'))
         assert stereo_result['ok'],stereo_result
         raw=subprocess.check_output([str(args.ffmpeg.resolve()),'-v','error','-i',stereo_result['output'],'-vn','-ac','2','-ar','48000','-f','f32le','pipe:1'],timeout=30)
@@ -84,6 +84,16 @@ def main():
         assert max(abs(v) for v in left[48000:57600])>.04
         assert max(abs(v) for v in right[48000:57600])>.04
         assert max(abs(a+b) for a,b in zip(left[48000:57600],right[48000:57600]))<.002
+        long_audio=input_dir/'nhạc dài.wav'
+        run([args.ffmpeg.resolve(),'-v','error','-y','-f','lavfi','-i','sine=frequency=880:sample_rate=48000:duration=2',long_audio])
+        limited_dir=root/'giới hạn nhạc';limited_dir.mkdir(exist_ok=True)
+        limited_report=root/'limited.json'
+        run([exe,'--smoke-test',silent,'--audio-file',long_audio,'--audio-duration','0.6','--output-dir',limited_dir,'--report',limited_report],env=restricted,cwd=app_dir)
+        limited=json.loads(limited_report.read_text(encoding='utf-8'));assert limited['ok'],limited
+        pcm=subprocess.check_output([str(args.ffmpeg.resolve()),'-v','error','-i',limited['output'],'-vn','-ac','1','-ar','48000','-f','f32le','pipe:1'],timeout=30)
+        played_samples=array('f');played_samples.frombytes(pcm)
+        assert max(abs(v) for v in played_samples[9600:19200])>.1
+        assert max(abs(v) for v in played_samples[48000:57600])<.001
         inserted_play=root/'inserted-playback.json'
         run([exe,'--playback-smoke-test',silent,'--audio-file',audio,'--report',inserted_play],env=playback_env,cwd=app_dir)
         inserted=json.loads(inserted_play.read_text(encoding='utf-8'))

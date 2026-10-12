@@ -125,7 +125,7 @@ def test_non_audio_file_fails_without_replacing_destination(clips,tmp_path):
 def test_stereo_insert_preserves_opposite_phase_channels_with_mono_source(clips,tmp_path):
     audio=tmp_path/'stereo.wav'
     run('ffmpeg','-v','error','-y','-f','lavfi','-i','aevalsrc=0.1*sin(2*PI*880*t)|-0.1*sin(2*PI*880*t):s=48000:d=0.4',audio)
-    output=render(clips['source'],EditOptions(source_volume=0,audio_path=audio,added_volume=.5),tmp_path)
+    output=render(clips['source'],EditOptions(source_volume=0,audio_path=audio,added_volume=.5,audio_loop=True),tmp_path)
     metadata=run('ffprobe','-v','error','-show_streams','-of','json',output)
     import json
     stream=next(s for s in json.loads(metadata.stdout)['streams'] if s['codec_type']=='audio')
@@ -136,3 +136,30 @@ def test_stereo_insert_preserves_opposite_phase_channels_with_mono_source(clips,
     assert tone(left,880,1.2,1.4)==pytest.approx(.05,abs=.004)
     assert tone(right,880,1.2,1.4)==pytest.approx(.05,abs=.004)
     assert max(abs(a+b) for a,b in zip(left[57600:67200],right[57600:67200]))<.002
+
+
+def test_inserted_track_defaults_to_playing_once(clips,tmp_path,soundtrack):
+    edit=EditOptions(audio_path=soundtrack)
+    assert not edit.audio_loop
+    values=samples(render(clips['silent'],edit,tmp_path))
+    assert tone(values,880)==pytest.approx(.125,abs=.004)
+    assert tone(values,880,1.2,1.4)==pytest.approx(0,abs=.003)
+
+
+@pytest.mark.parametrize('limit',[0,-1,float('nan'),float('inf')])
+def test_audio_duration_requires_positive_finite_seconds(limit):
+    with pytest.raises(ValueError): validate_options(EditOptions(audio_duration=limit),320,240,4)
+
+
+@pytest.mark.parametrize('loop',[False,True])
+@pytest.mark.parametrize('preview',[False,True])
+def test_added_audio_duration_caps_music_but_keeps_original_and_video(clips,tmp_path,loop,preview):
+    audio=tmp_path/'music.wav'
+    run('ffmpeg','-v','error','-y','-f','lavfi','-i','sine=frequency=880:sample_rate=48000:duration=2',audio)
+    edit=EditOptions(audio_path=audio,audio_loop=loop,audio_duration=.6,source_volume=.5,added_volume=.25)
+    output=render(clips['source'],edit,tmp_path,preview)
+    values=samples(output)
+    assert probe(output).duration==pytest.approx(4,abs=.07)
+    assert tone(values,880,.2,.4)==pytest.approx(.03125,abs=.004)
+    assert tone(values,880,1.2,1.4)==pytest.approx(0,abs=.003)
+    assert tone(values,440,1.2,1.4)==pytest.approx(.0625,abs=.004)

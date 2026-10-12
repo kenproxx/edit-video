@@ -49,7 +49,8 @@ class EditOptions:
     source_volume: float = 1
     audio_path: Path | None = None
     added_volume: float = 1
-    audio_loop: bool = True
+    audio_loop: bool = False
+    audio_duration: float | None = None
 
 
 def _integer(value: int, name: str, minimum: int = 0) -> None:
@@ -81,6 +82,8 @@ def validate_options(options: EditOptions, width: int, height: int, duration: fl
     for volume in (options.source_volume,options.added_volume):
         if not math.isfinite(volume) or not 0 <= volume <= 2:
             raise ValueError('Âm lượng phải từ 0 đến 200%')
+    if options.audio_duration is not None and (not math.isfinite(options.audio_duration) or options.audio_duration <= 0):
+        raise ValueError('Thời lượng âm thanh chèn phải là số giây lớn hơn 0')
     if options.audio_path is not None and not options.audio_path.is_file():
         raise ValueError('Không tìm thấy file âm thanh chèn')
     from .timing import trimmed_duration

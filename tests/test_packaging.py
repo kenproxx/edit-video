@@ -258,7 +258,7 @@ def test_cli_exports_with_independent_audio_levels(tmp_path,clips):
     audio=tmp_path/'track.wav'
     subprocess.run(['ffmpeg','-v','error','-y','-f','lavfi','-i','sine=frequency=880:duration=0.4',str(audio)],check=True)
     output=tmp_path/'out';output.mkdir();report=tmp_path/'audio.json'
-    result=subprocess.run([sys.executable,str(ROOT/'main.py'),'--smoke-test',str(source),'--audio-file',str(audio),'--source-volume','25','--added-volume','60','--output-dir',str(output),'--report',str(report)],capture_output=True,text=True,timeout=30)
+    result=subprocess.run([sys.executable,str(ROOT/'main.py'),'--smoke-test',str(source),'--audio-file',str(audio),'--source-volume','25','--added-volume','60','--audio-loop','--output-dir',str(output),'--report',str(report)],capture_output=True,text=True,timeout=30)
     assert result.returncode==0,result.stderr
     data=json.loads(report.read_text(encoding='utf-8'))
     assert data['ok'] and data['audio_codec']=='aac'
@@ -274,3 +274,16 @@ def test_cli_embedded_playback_uses_inserted_audio_on_silent_video(tmp_path,clip
     assert result.returncode==0,result.stderr
     data=json.loads(report.read_text(encoding='utf-8'))
     assert data['ok'] and data['playback'] and data['audio']
+
+
+def test_cli_inserted_audio_duration_caps_once_track(tmp_path,clips):
+    import subprocess,sys,json
+    audio=tmp_path/'long.wav';output=tmp_path/'out';output.mkdir();report=tmp_path/'limited.json'
+    subprocess.run(['ffmpeg','-v','error','-y','-f','lavfi','-i','sine=frequency=880:duration=2',str(audio)],check=True)
+    result=subprocess.run([sys.executable,str(ROOT/'main.py'),'--smoke-test',str(clips['silent']),'--audio-file',str(audio),'--audio-duration','0.6','--output-dir',str(output),'--report',str(report)],capture_output=True,text=True,timeout=30)
+    assert result.returncode==0,result.stderr
+    data=json.loads(report.read_text(encoding='utf-8'));assert data['ok'],data
+    from test_audio_edit import samples,tone
+    values=samples(Path(data['output']))
+    assert tone(values,880,.2,.4)==pytest.approx(.125,abs=.004)
+    assert tone(values,880,1.2,1.4)==pytest.approx(0,abs=.003)

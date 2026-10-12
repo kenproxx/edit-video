@@ -114,7 +114,8 @@ def prepare_render(source: Path, info: MediaInfo, options: EditOptions, destinat
         else:
             graph += f';[0:a:0]{trim}asetpts=PTS-STARTPTS,{_audio_speed(options.speed)},asetpts=PTS+{offset:.9g}/TB{gain}[{source_label}]'
     if options.audio_path is not None:
-        graph += f';[{audio_index}:a:0]asetpts=PTS-STARTPTS,volume={options.added_volume:.9g},apad=whole_dur={duration:.9g},atrim=duration={duration:.9g},asetpts=N/SR/TB[added]'
+        added_duration=min(duration,options.audio_duration) if options.audio_duration is not None else duration
+        graph += f';[{audio_index}:a:0]asetpts=PTS-STARTPTS,atrim=duration={added_duration:.9g},volume={options.added_volume:.9g},apad=whole_dur={duration:.9g},atrim=duration={duration:.9g},asetpts=N/SR/TB[added]'
         if has_audio:
             # Negotiate stereo before mixing: a mono original must not collapse
             # stereo music (opposite-phase channels can cancel completely).

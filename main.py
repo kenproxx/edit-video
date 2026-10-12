@@ -14,7 +14,10 @@ def main(argv=None) -> int:
     parser.add_argument('--audio-file',type=Path,help='Inserted audio for export/playback smoke checks')
     parser.add_argument('--source-volume',type=float,default=100,help='Original audio volume percent (0–200)')
     parser.add_argument('--added-volume',type=float,default=100,help='Inserted audio volume percent (0–200)')
-    parser.add_argument('--audio-once',action='store_true',help='Play inserted audio once instead of looping')
+    audio_mode=parser.add_mutually_exclusive_group()
+    audio_mode.add_argument('--audio-loop',action='store_true',help='Loop inserted audio until its duration limit or video end')
+    audio_mode.add_argument('--audio-once',action='store_true',help='Play inserted audio once (default)')
+    parser.add_argument('--audio-duration',type=float,help='Maximum inserted audio playback seconds')
     parser.add_argument('--output-dir',type=Path)
     parser.add_argument('--report',type=Path,help='JSON result file (required for packaged smoke tests)')
     args = parser.parse_args(argv)
@@ -33,7 +36,7 @@ def main(argv=None) -> int:
             if args.smoke_test is not None:
                 from app.selftest import smoke_export
                 from app.models import EditOptions
-                options=EditOptions(source_volume=args.source_volume/100,audio_path=args.audio_file,added_volume=args.added_volume/100,audio_loop=not args.audio_once)
+                options=EditOptions(source_volume=args.source_volume/100,audio_path=args.audio_file,added_volume=args.added_volume/100,audio_loop=args.audio_loop,audio_duration=args.audio_duration)
                 result = smoke_export(args.smoke_test,args.output_dir,options=options)
             elif args.playback_smoke_test is not None:
                 from app.selftest import smoke_embedded_playback

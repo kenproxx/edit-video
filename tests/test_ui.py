@@ -461,3 +461,15 @@ def test_audio_controls_picker_levels_and_reset(editor,clips,monkeypatch,tmp_pat
     assert panel.read_options().audio_path is None
     panel.set_media(probe(clips['source']))
     assert panel.read_options().source_volume==1 and panel.read_options().audio_path is None
+
+
+def test_audio_duration_control_and_once_default(editor,clips):
+    load(editor,clips['source'])
+    panel=editor.options
+    assert 'audio_duration' in panel.vars, 'Audio duration control missing'
+    assert not panel.read_options().audio_loop
+    assert panel.read_options().audio_duration is None
+    panel.vars['audio_duration'].set('1,5')
+    assert panel.read_options().audio_duration==1.5
+    panel.set_media(probe(clips['source']))
+    assert panel.read_options().audio_duration is None and not panel.read_options().audio_loop
