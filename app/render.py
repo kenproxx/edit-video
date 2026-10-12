@@ -86,6 +86,14 @@ def prepare_render(source: Path, info: MediaInfo, options: EditOptions, destinat
     if preview:
         width,height=preview_size(info,options)
         graph=graph.replace('format=yuv420p[vout]',f'scale={width}:{height},setsar=1,format=yuv420p[vout]')
+    if options.audio_path is not None:
+        audio_path=options.audio_path.resolve()
+        if audio_path==destination.resolve() or (destination.exists() and audio_path.samefile(destination)):
+            raise ValueError('Output không được trùng file âm thanh chèn')
+        # Video/overlay inputs are already present; use the actual next input index.
+        audio_index=args.count('-i')
+        if options.audio_loop: args += ['-stream_loop','-1']
+        args += ['-threads','2','-i',str(audio_path)]
     start,end = source_interval(options,info.duration)
     duration = trimmed_duration(options,info.duration)
     has_audio = info.has_audio and end > info.audio_offset
@@ -96,14 +104,25 @@ def prepare_render(source: Path, info: MediaInfo, options: EditOptions, destinat
         else:
             trim = f'atrim=start={-info.audio_offset:.9g},' if info.audio_offset < 0 else ''
         offset = max(0, info.audio_offset-start) / options.speed
-        if preview:
+        materialize=preview or options.audio_path is not None
+        source_label='original' if options.audio_path is not None else 'aout'
+        gain=f',volume={options.source_volume:.9g}'
+        if materialize:
             # Audio-only playback starts at zero: include the source delay as
             # actual silence, rather than relying on container timestamps.
-            graph += f';[0:a:0]{trim}asetpts=PTS-STARTPTS,{_audio_speed(options.speed)},adelay={offset*1000:.9g}:all=1,apad=whole_dur={duration:.9g},asetpts=N/SR/TB[aout]'
+            graph += f';[0:a:0]{trim}asetpts=PTS-STARTPTS,{_audio_speed(options.speed)},adelay={offset*1000:.9g}:all=1,apad=whole_dur={duration:.9g},asetpts=N/SR/TB{gain}[{source_label}]'
         else:
-            graph += f';[0:a:0]{trim}asetpts=PTS-STARTPTS,{_audio_speed(options.speed)},asetpts=PTS+{offset:.9g}/TB[aout]'
+            graph += f';[0:a:0]{trim}asetpts=PTS-STARTPTS,{_audio_speed(options.speed)},asetpts=PTS+{offset:.9g}/TB{gain}[{source_label}]'
+    if options.audio_path is not None:
+        graph += f';[{audio_index}:a:0]asetpts=PTS-STARTPTS,volume={options.added_volume:.9g},apad=whole_dur={duration:.9g},atrim=duration={duration:.9g},asetpts=N/SR/TB[added]'
+        if has_audio:
+            # Negotiate stereo before mixing: a mono original must not collapse
+            # stereo music (opposite-phase channels can cancel completely).
+            graph += ';[original]aformat=channel_layouts=stereo[original_stereo];[added]aformat=channel_layouts=stereo[added_stereo];[original_stereo][added_stereo]amix=inputs=2:duration=longest:dropout_transition=0:normalize=0[aout]'
+        else:
+            graph += ';[added]anull[aout]'
     args += ['-filter_complex_threads', '2', '-filter_complex', graph, '-map', '[vout]']
-    if has_audio:
+    if has_audio or options.audio_path is not None:
         args += ['-map', '[aout]', '-c:a', 'aac', '-b:a', '192k']
     else:
         args += ['-an']

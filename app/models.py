@@ -46,6 +46,10 @@ class EditOptions:
     intro_duration: float = 1
     trim_start: float = 0
     trim_end: float | None = None
+    source_volume: float = 1
+    audio_path: Path | None = None
+    added_volume: float = 1
+    audio_loop: bool = True
 
 
 def _integer(value: int, name: str, minimum: int = 0) -> None:
@@ -74,6 +78,11 @@ def validate_options(options: EditOptions, width: int, height: int, duration: fl
         raise ValueError('Thời lượng video không hợp lệ')
     if not math.isfinite(options.speed) or not .25 <= options.speed <= 4:
         raise ValueError('Tốc độ phải từ 0.25 đến 4')
+    for volume in (options.source_volume,options.added_volume):
+        if not math.isfinite(volume) or not 0 <= volume <= 2:
+            raise ValueError('Âm lượng phải từ 0 đến 200%')
+    if options.audio_path is not None and not options.audio_path.is_file():
+        raise ValueError('Không tìm thấy file âm thanh chèn')
     from .timing import trimmed_duration
     output_duration = trimmed_duration(options,duration)
     if options.crop:

@@ -157,7 +157,7 @@ class PlaybackController:
         self.pause()
         path,info,options=self._proxy
         _,end=source_interval(options,info.duration)
-        audio=info.has_audio and end>info.audio_offset
+        audio=(info.has_audio and end>info.audio_offset) or options.audio_path is not None
         self._reader=FrameReader(path,preview_size(info,options),info.fps,time,self._generation,audio,self.duration)
 
     def poll(self):

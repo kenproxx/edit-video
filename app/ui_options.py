@@ -94,16 +94,25 @@ class OptionsPanel(ctk.CTkScrollableFrame):
         self.changed = changed
         self._suspend = 0
         self.info = None
-        defaults = dict(speed='1',crop_x='0',crop_y='0',crop_width='0',crop_height='0',blur_x='0',blur_y='0',blur_width='40',blur_height='40',blur_strength='10',logo_path='',logo_x='0',logo_y='0',logo_width='64',logo_height='',logo_opacity='1',trim_start='00:00',trim_end='00:00',intro_duration='1')
+        defaults = dict(source_volume='100',added_volume='100',audio_path='',speed='1',crop_x='0',crop_y='0',crop_width='0',crop_height='0',blur_x='0',blur_y='0',blur_width='40',blur_height='40',blur_strength='10',logo_path='',logo_x='0',logo_y='0',logo_width='64',logo_height='',logo_opacity='1',trim_start='00:00',trim_end='00:00',intro_duration='1')
         self.vars = {n:tk.StringVar(value=v) for n,v in defaults.items()}
-        for n in ('flip_horizontal','flip_vertical','crop_enabled','blur_enabled','logo_enabled','trim_enabled'):
+        for n in ('flip_horizontal','flip_vertical','crop_enabled','blur_enabled','logo_enabled','trim_enabled','audio_enabled'):
             self.vars[n] = tk.BooleanVar(value=False)
+        self.vars['audio_loop']=tk.BooleanVar(value=True)
         self.controls = []
         self._row = 0
         self._check('trim_enabled','Cắt đoạn video nguồn')
         self._entry('trim_start','Từ (phút:giây)')
         self._entry('trim_end','Tới (phút:giây)')
         self._entry('speed','Tốc độ (0.25–4)')
+        self._entry('source_volume','Âm lượng gốc (0–200%)')
+        self._check('audio_enabled','Chèn âm thanh')
+        self._entry('audio_path','File âm thanh')
+        button=ctk.CTkButton(self,text='Chọn âm thanh',command=self.choose_audio)
+        button.grid(row=self._row,column=0,sticky='ew',pady=4,padx=3);self._row+=1
+        self.controls.append(button)
+        self._entry('added_volume','Âm lượng chèn (0–200%)')
+        self._check('audio_loop','Lặp âm thanh đến hết video')
         self._check('flip_horizontal','Lật ngang')
         self._check('flip_vertical','Lật dọc')
         self._check('crop_enabled','Bật crop')
@@ -176,7 +185,9 @@ class OptionsPanel(ctk.CTkScrollableFrame):
             self.vars['trim_start'].set('00:00');self.vars['trim_end'].set(format_time(info.duration))
             self.vars['logo_height'].set('')
             self.vars['speed'].set('1')
-            for name in ('flip_horizontal','flip_vertical','crop_enabled','blur_enabled','logo_enabled','trim_enabled'):
+            self.vars['source_volume'].set('100');self.vars['added_volume'].set('100')
+            self.vars['audio_path'].set('');self.vars['audio_loop'].set(True)
+            for name in ('flip_horizontal','flip_vertical','crop_enabled','blur_enabled','logo_enabled','trim_enabled','audio_enabled'):
                 self.vars[name].set(False)
             for prefix in ('crop','blur','logo'):
                 self.vars[prefix+'_x'].set('0');self.vars[prefix+'_y'].set('0')
@@ -249,6 +260,13 @@ class OptionsPanel(ctk.CTkScrollableFrame):
         if kind == 'crop': self._field_changed('crop_enabled')
         else: self._notify('edit')
 
+    def choose_audio(self):
+        path=filedialog.askopenfilename(parent=self.winfo_toplevel(),title='Chọn âm thanh chèn',filetypes=[('Âm thanh','*.mp3 *.wav *.m4a *.aac *.flac *.ogg'),('Tất cả file','*.*')])
+        if path:
+            with self.batch():
+                self.vars['audio_path'].set(path);self.vars['audio_enabled'].set(True)
+            self._notify('edit')
+
     def choose_logo(self):
         path = filedialog.askopenfilename(parent=self.winfo_toplevel(),title='Chọn watermark logo',filetypes=[('Ảnh','*.png *.jpg *.jpeg')])
         if path: self.vars['logo_path'].set(path)
@@ -269,7 +287,7 @@ class OptionsPanel(ctk.CTkScrollableFrame):
                 logo = LogoOverlay(Path(self.vars['logo_path'].get()),int(self.vars['logo_x'].get()),int(self.vars['logo_y'].get()),int(self.vars['logo_width'].get()),float(self.vars['logo_opacity'].get().replace(',','.')),int(self.vars['logo_height'].get()) if self.vars['logo_height'].get().strip() else None)
             from dataclasses import replace
             intro = None if exclude == 'intro' else self.text_panels['intro'].read()
-            return replace(base,crop=rect('crop'),blur=rect('blur'),blur_strength=int(self.vars['blur_strength'].get()) if exclude != 'blur' and self.vars['blur_enabled'].get() else 10,logo=logo,watermark=None if exclude == 'watermark' else self.text_panels['watermark'].read(),intro=intro,intro_duration=float(self.vars['intro_duration'].get().replace(',','.')) if intro else 1)
+            return replace(base,source_volume=float(self.vars['source_volume'].get().replace(',','.'))/100,added_volume=float(self.vars['added_volume'].get().replace(',','.'))/100,audio_path=Path(self.vars['audio_path'].get()) if self.vars['audio_enabled'].get() else None,audio_loop=self.vars['audio_loop'].get(),crop=rect('crop'),blur=rect('blur'),blur_strength=int(self.vars['blur_strength'].get()) if exclude != 'blur' and self.vars['blur_enabled'].get() else 10,logo=logo,watermark=None if exclude == 'watermark' else self.text_panels['watermark'].read(),intro=intro,intro_duration=float(self.vars['intro_duration'].get().replace(',','.')) if intro else 1)
         except ValueError as exc:
             raise ValueError('Kiểm tra các ô số: X/Y/kích thước là số nguyên; tốc độ/thời gian/độ đậm là số thực') from exc
 

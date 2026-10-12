@@ -443,3 +443,21 @@ def test_text_resize_at_edge_keeps_live_and_export_bounds(editor,clips,font,posi
     options=editor.options.read_options();validate_options(options,320,240,4)
     text=options.watermark;w,h=text_bounds(text,ImageFont.truetype(str(text.font),text.size))[1]
     assert live==Rect(text.x,text.y,w,h)
+
+
+def test_audio_controls_picker_levels_and_reset(editor,clips,monkeypatch,tmp_path):
+    load(editor,clips['silent'])
+    audio=tmp_path/'nhạc chèn.wav';audio.write_bytes(b'picker fixture')
+    import app.ui_options as options_ui
+    monkeypatch.setattr(options_ui.filedialog,'askopenfilename',lambda **kwargs:str(audio))
+    panel=editor.options
+    assert hasattr(panel,'choose_audio'), 'Inserted audio picker missing'
+    panel.choose_audio()
+    panel.vars['source_volume'].set('25');panel.vars['added_volume'].set('60')
+    panel.vars['audio_loop'].set(False)
+    options=panel.read_options()
+    assert options.audio_path==audio and options.source_volume==.25 and options.added_volume==.6 and not options.audio_loop
+    panel.vars['audio_enabled'].set(False)
+    assert panel.read_options().audio_path is None
+    panel.set_media(probe(clips['source']))
+    assert panel.read_options().source_volume==1 and panel.read_options().audio_path is None

@@ -11,6 +11,10 @@ def main(argv=None) -> int:
     modes.add_argument('--smoke-test',type=Path,metavar='INPUT',help='Export with bundled tools without opening the GUI')
     modes.add_argument('--gui-smoke-test',action='store_true',help='Open and close the native GUI')
     modes.add_argument('--playback-smoke-test',type=Path,metavar='INPUT',help='Exercise embedded playback, trim, pause and seek')
+    parser.add_argument('--audio-file',type=Path,help='Inserted audio for export/playback smoke checks')
+    parser.add_argument('--source-volume',type=float,default=100,help='Original audio volume percent (0–200)')
+    parser.add_argument('--added-volume',type=float,default=100,help='Inserted audio volume percent (0–200)')
+    parser.add_argument('--audio-once',action='store_true',help='Play inserted audio once instead of looping')
     parser.add_argument('--output-dir',type=Path)
     parser.add_argument('--report',type=Path,help='JSON result file (required for packaged smoke tests)')
     args = parser.parse_args(argv)
@@ -28,10 +32,12 @@ def main(argv=None) -> int:
                 report = args.report.open('x',encoding='utf-8')
             if args.smoke_test is not None:
                 from app.selftest import smoke_export
-                result = smoke_export(args.smoke_test,args.output_dir)
+                from app.models import EditOptions
+                options=EditOptions(source_volume=args.source_volume/100,audio_path=args.audio_file,added_volume=args.added_volume/100,audio_loop=not args.audio_once)
+                result = smoke_export(args.smoke_test,args.output_dir,options=options)
             elif args.playback_smoke_test is not None:
                 from app.selftest import smoke_embedded_playback
-                result = smoke_embedded_playback(args.playback_smoke_test)
+                result = smoke_embedded_playback(args.playback_smoke_test,args.audio_file)
             else:
                 from app.ui import VideoEditorApp
                 app = VideoEditorApp()

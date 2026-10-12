@@ -143,3 +143,20 @@ def test_display_frames_follow_monotonic_clock_and_finish_full_duration(clips):
         assert all(abs(stamp-elapsed)<.16 for stamp,elapsed in frames)
         assert completed is not None and player.duration-.12<=completed-origin<=player.duration+.35
     finally: close(player)
+
+
+def test_silent_source_with_inserted_audio_starts_audio_process(clips,tmp_path,monkeypatch):
+    import subprocess
+    monkeypatch.setenv('SDL_AUDIODRIVER','dummy')
+    audio=tmp_path/'track.wav'
+    subprocess.run(['ffmpeg','-v','error','-y','-f','lavfi','-i','sine=frequency=880:duration=0.4',str(audio)],check=True)
+    player=controller()
+    try:
+        player.prepare(clips['silent'],probe(clips['silent']),EditOptions(audio_path=audio))
+        event=wait(player,lambda e:e.kind in ('ready','error'));assert event.kind=='ready',event.message
+        player.play(0)
+        event=wait(player,lambda e:e.kind=='frame');event.image.close()
+        audio_process=player._reader.audio_process
+        assert audio_process is not None and audio_process.poll() is None
+    finally: close(player)
+    assert audio_process.poll() is not None

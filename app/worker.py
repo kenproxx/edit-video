@@ -50,6 +50,9 @@ class RenderWorker:
             return result
 
     def start(self, source: Path, info: MediaInfo, options: EditOptions, reservation: OutputReservation, preview: bool = False) -> None:
+        if options.audio_path is not None and options.audio_path.exists():
+            if options.audio_path.resolve()==reservation.destination.resolve() or (reservation.destination.exists() and options.audio_path.samefile(reservation.destination)):
+                raise ValueError('Output không được trùng file âm thanh chèn')
         with self._lock:
             if self._running:
                 raise RuntimeError('Một tác vụ xuất đang chạy')

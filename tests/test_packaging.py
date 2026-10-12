@@ -182,6 +182,10 @@ FILTER_TABLE_8 = '''Filters:
   A = Audio input/output
   V = Video input/output
   ------
+ .. aformat           A->A       Convert audio format.
+ .. volume            A->A       Adjust volume.
+ .. amix              AA->A      Mix audio.
+ .. anull             A->A       Pass audio.
  .. adelay            A->A       Delay audio.
  .. apad              A->A       Pad audio.
  .. trim              V->V       Trim video.
@@ -246,3 +250,27 @@ def test_embedded_playback_smoke_cli(clips,tmp_path,monkeypatch):
     data=json.loads(report.read_text(encoding='utf-8'))
     assert data['ok'] and data['playback'] and data['frames']>=4 and data['audio']
     assert data['duration']==pytest.approx(1,abs=.04)
+
+
+def test_cli_exports_with_independent_audio_levels(tmp_path,clips):
+    import subprocess,sys,json
+    source=tmp_path/'movie.mp4';source.write_bytes(clips['silent'].read_bytes())
+    audio=tmp_path/'track.wav'
+    subprocess.run(['ffmpeg','-v','error','-y','-f','lavfi','-i','sine=frequency=880:duration=0.4',str(audio)],check=True)
+    output=tmp_path/'out';output.mkdir();report=tmp_path/'audio.json'
+    result=subprocess.run([sys.executable,str(ROOT/'main.py'),'--smoke-test',str(source),'--audio-file',str(audio),'--source-volume','25','--added-volume','60','--output-dir',str(output),'--report',str(report)],capture_output=True,text=True,timeout=30)
+    assert result.returncode==0,result.stderr
+    data=json.loads(report.read_text(encoding='utf-8'))
+    assert data['ok'] and data['audio_codec']=='aac'
+    from test_audio_edit import samples,tone
+    assert tone(samples(output/'movie.mp4'),880,1.2,1.4)==pytest.approx(.075,abs=.004)
+
+
+def test_cli_embedded_playback_uses_inserted_audio_on_silent_video(tmp_path,clips):
+    import subprocess,sys,json
+    audio=tmp_path/'track.wav';report=tmp_path/'play.json'
+    subprocess.run(['ffmpeg','-v','error','-y','-f','lavfi','-i','sine=frequency=880:duration=0.4',str(audio)],check=True)
+    result=subprocess.run([sys.executable,str(ROOT/'main.py'),'--playback-smoke-test',str(clips['silent']),'--audio-file',str(audio),'--report',str(report)],capture_output=True,text=True,timeout=30)
+    assert result.returncode==0,result.stderr
+    data=json.loads(report.read_text(encoding='utf-8'))
+    assert data['ok'] and data['playback'] and data['audio']

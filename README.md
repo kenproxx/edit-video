@@ -6,6 +6,7 @@ App desktop Python để chỉnh một video và xuất MP4 mới. **Đã có GU
 
 - Chọn video và thư mục xuất; tên mặc định lấy từ tên input.
 - Tốc độ 0.25–4×, audio giữ cao độ; lật ngang/dọc.
+- Âm lượng tiếng gốc và file âm thanh chèn riêng (0–200%); hỗ trợ lặp nhạc hoặc phát một lần.
 - Cắt đoạn từ/tới theo phút:giây hoặc số phút; tốc độ áp dụng sau khi cắt.
 - Crop bằng kéo góc/cạnh, di chuyển vùng, nhập pixel hoặc preset 9:16 / 16:9 / 1:1.
 - Blur một vùng cố định; kéo để di chuyển/đổi kích thước logo và chữ watermark.
@@ -46,10 +47,11 @@ GUI cần màn hình thật hoặc Xvfb. Bản đóng gói dành cho Windows 10/
 
 1. Chọn video, thư mục xuất và kiểm tra tên MP4. Không chọn output trùng video nguồn.
 2. Chỉnh tùy chọn bên phải; cuộn để thấy logo/text. Bật **Cắt đoạn** rồi nhập từ/tới: `2:30` là 2 phút 30 giây, `2.5` là 2.5 phút. Các tọa độ/kích thước là pixel video, độ đậm từ 0 đến 1.
-3. Dropdown preview: **Chọn crop** dùng ảnh nguồn sau lật; **Chọn vùng blur** dùng ảnh sau crop. Kéo vùng chữ nhật; kéo góc/cạnh để resize, kéo bên trong để di chuyển. Với logo/watermark/text đầu, bật layer, chọn mode tương ứng rồi kéo trực tiếp. Logo cho phép kéo giãn độc lập; text giữ tỷ lệ theo font.
-4. Chọn **Xem kết quả** hoặc **Phát preview** để xem đủ hiệu ứng ngay trong app. Lần đầu hoặc sau thay đổi, app chuẩn bị bản preview; các lần phát/seek sau dùng lại. **Tạm dừng** để chỉnh vùng trên ảnh rõ nét. Thanh thời gian tính theo đoạn đầu ra sau cắt và đổi tốc độ.
-5. Đổi crop/lật sẽ tắt các vùng/layer phụ thuộc và báo chọn lại để tránh dùng nhầm tọa độ. Nội dung chữ/file logo được giữ để bật lại sau khi kiểm tra.
-6. **Xuất video**; xác nhận nếu file đích đã tồn tại. Có thể hủy hoặc đóng cửa sổ để hủy và chờ dọn tác vụ.
+3. **Âm lượng gốc** chỉnh tiếng video; 0% để tắt tiếng. Bật **Chèn âm thanh**, chọn MP3/WAV/M4A/AAC/FLAC/OGG và chỉnh **Âm lượng chèn**. Nhạc phát từ đầu đoạn video đầu ra, giữ tốc độ bản nhạc; bật **Lặp âm thanh đến hết video** hoặc tắt để phát một lần. Khi trộn, đầu ra là stereo. Preview và export dùng cùng cách trộn; khi tổng âm lượng lớn, giảm hai mức để tránh vỡ tiếng.
+4. Dropdown preview: **Chọn crop** dùng ảnh nguồn sau lật; **Chọn vùng blur** dùng ảnh sau crop. Kéo vùng chữ nhật; kéo góc/cạnh để resize, kéo bên trong để di chuyển. Với logo/watermark/text đầu, bật layer, chọn mode tương ứng rồi kéo trực tiếp. Logo cho phép kéo giãn độc lập; text giữ tỷ lệ theo font.
+5. Chọn **Xem kết quả** hoặc **Phát preview** để xem đủ hiệu ứng ngay trong app. Lần đầu hoặc sau thay đổi, app chuẩn bị bản preview; các lần phát/seek sau dùng lại. **Tạm dừng** để chỉnh vùng trên ảnh rõ nét. Thanh thời gian tính theo đoạn đầu ra sau cắt và đổi tốc độ.
+6. Đổi crop/lật sẽ tắt các vùng/layer phụ thuộc và báo chọn lại để tránh dùng nhầm tọa độ. Nội dung chữ/file logo được giữ để bật lại sau khi kiểm tra.
+7. **Xuất video**; xác nhận nếu file đích đã tồn tại. Có thể hủy hoặc đóng cửa sổ để hủy và chờ dọn tác vụ.
 
 Preview phát tối đa 960×540/15 fps để giảm tải; xuất giữ độ phân giải đã chọn. Đoạn quá ngắn không chứa frame sẽ báo lỗi và giữ file đích cũ.
 

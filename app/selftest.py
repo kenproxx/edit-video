@@ -11,7 +11,7 @@ from .output import reserve_output
 from .resources import binary_path, resource_root
 from .worker import RenderWorker
 
-REQUIRED_FILTERS = {'scale','setsar','format','hflip','vflip','crop','setpts','fps','split','gblur','overlay','atrim','asetpts','atempo','trim','adelay','apad'}
+REQUIRED_FILTERS = {'scale','setsar','format','hflip','vflip','crop','setpts','fps','split','gblur','overlay','atrim','asetpts','atempo','trim','adelay','apad','volume','amix','anull','aformat'}
 
 
 def _run(args):
@@ -35,13 +35,14 @@ def verify_media_tools() -> dict:
     return versions
 
 
-def smoke_export(source: Path, directory: Path, timeout: float = 120) -> dict:
+def smoke_export(source: Path, directory: Path, timeout: float = 120, options: EditOptions | None = None) -> dict:
     versions = verify_media_tools()
     info = probe(source)
     destination = default_output(source,directory)
     reservation = reserve_output(source,destination,False)
     worker = RenderWorker()
-    worker.start(source,info,EditOptions(),reservation)
+    options=options or EditOptions()
+    worker.start(source,info,options,reservation)
     deadline = time.monotonic()+timeout
     terminal = None
     while worker.running or terminal is None:
@@ -59,13 +60,14 @@ def smoke_export(source: Path, directory: Path, timeout: float = 120) -> dict:
     video = next(stream for stream in data['streams'] if stream['codec_type']=='video')
     audio = next((stream for stream in data['streams'] if stream['codec_type']=='audio'),None)
     duration = float(data['format']['duration'])
-    if video['codec_name'] != 'h264' or (info.has_audio and (audio is None or audio['codec_name'] != 'aac')):
+    if video['codec_name'] != 'h264' or ((info.has_audio or options.audio_path is not None) and (audio is None or audio['codec_name'] != 'aac')):
         raise ValueError('Smoke output codec mismatch')
-    if abs(duration-info.duration) > max(.15,2/info.fps): raise ValueError('Smoke output duration mismatch')
+    from .timing import trimmed_duration
+    if abs(duration-trimmed_duration(options,info.duration)) > max(.15,2/info.fps): raise ValueError('Smoke output duration mismatch')
     return {'ok':True,'output':str(destination),'duration':duration,'width':video['width'],'height':video['height'],'video_codec':video['codec_name'],'audio_codec':audio['codec_name'] if audio else None,'tools':versions,'resource_root':str(resource_root())}
 
 
-def smoke_embedded_playback(source: Path) -> dict:
+def smoke_embedded_playback(source: Path, audio_path: Path | None = None) -> dict:
     from .ui import VideoEditorApp
     from .models import Rect
     from .timing import format_time
@@ -98,6 +100,10 @@ def smoke_embedded_playback(source: Path) -> dict:
                     app.options.vars['trim_start'].set(format_time(.25))
                     app.options.vars['trim_end'].set(format_time(1.75))
                     app.options.vars['speed'].set('1.5')
+                    app.options.vars['source_volume'].set('25')
+                    app.options.vars['added_volume'].set('60')
+                    if audio_path is not None:
+                        app.options.vars['audio_path'].set(str(audio_path));app.options.vars['audio_enabled'].set(True)
                     app.options.vars['flip_horizontal'].set(True)
                 app.options.apply_region('crop',Rect(0,0,app.media_info.width//4*2,app.media_info.height//4*2))
                 app.start_playback();state['phase']='first'
