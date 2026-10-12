@@ -9,7 +9,7 @@ root = Path(SPECPATH)
 licenses = root/'build'/'licenses'
 if not licenses.is_dir():
     raise SystemExit('Run bootstrap-build.ps1 first to collect licenses.')
-binaries = [(str(root/'tools'/name),'tools') for name in ('ffmpeg.exe','ffprobe.exe')]
+binaries = [(str(root/'tools'/name),'tools') for name in ('ffmpeg.exe','ffprobe.exe','ffplay.exe')]
 datas = collect_data_files('customtkinter') + [
     (str(licenses),'licenses'),
     (str(root/'THIRD_PARTY_NOTICES.md'),'.'),

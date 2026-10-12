@@ -384,3 +384,41 @@ def test_logo_drag_and_resize_directly(editor,clips,tmp_path):
     canvas.press(canvas_point(canvas,60,60));canvas.release(canvas_point(canvas,100,80))
     logo=panel.read_options().logo
     assert (logo.x,logo.y,logo.width,logo.height)==(80,60,60,50)
+
+
+def test_embedded_play_pause_and_edit_invalidates_proxy(editor,clips):
+    load(editor,clips['silent'])
+    editor.options.vars['trim_enabled'].set(True)
+    editor.options.vars['trim_start'].set('00:01');editor.options.vars['trim_end'].set('00:03')
+    editor.start_playback()
+    spin(editor,lambda:editor.playback.playing and editor.time_var.get()>.1)
+    assert not editor.preview_canvas.enabled
+    editor.pause_playback()
+    spin(editor,lambda:editor._display_mode=='preview')
+    assert not editor.playback.playing and editor.playback.ready
+    editor.options.vars['flip_horizontal'].set(True)
+    assert not editor.playback.ready
+    editor.start_playback()
+    spin(editor,lambda:editor.playback.playing)
+    editor.request_close()
+    spin(editor,lambda:editor._destroyed)
+    assert not editor.playback.busy
+
+
+def test_watermark_moves_and_resizes_from_canvas(editor,clips,font):
+    load(editor,clips['source'])
+    panel=editor.options.text_panels['watermark']
+    panel.vars['font'].set(str(font));panel.vars['text'].set('WM');panel.vars['size'].set('16')
+    editor.options.apply_region('watermark',(40,40))
+    editor.mode_var.set('watermark');editor.selection_mode_changed()
+    spin(editor,lambda:editor._display_mode=='watermark')
+    canvas=editor.preview_canvas;region=canvas._selection
+    canvas.press(canvas_point(canvas,region.x+region.width/2,region.y+region.height/2))
+    canvas.release(canvas_point(canvas,region.x+region.width/2+20,region.y+region.height/2+20))
+    text=editor.options.read_options().watermark
+    assert (text.x,text.y)==(60,60)
+    spin(editor,lambda:editor._display_mode=='watermark')
+    region=canvas._selection
+    canvas.press(canvas_point(canvas,region.x+region.width,region.y+region.height))
+    canvas.release(canvas_point(canvas,region.x+region.width*2,region.y+region.height*2))
+    assert editor.options.read_options().watermark.size>16

@@ -10,7 +10,7 @@ def resource_root() -> Path:
 
 
 def binary_path(name: str) -> Path:
-    if name not in ('ffmpeg', 'ffprobe'):
+    if name not in ('ffmpeg', 'ffprobe', 'ffplay'):
         raise ValueError('Unsupported media binary')
     candidate = resource_root() / 'tools' / (name + ('.exe' if os.name == 'nt' else ''))
     if candidate.is_file():
@@ -30,3 +30,8 @@ def user_data_dir() -> Path:
     path = base / 'VideoEditor'
     path.mkdir(parents=True, exist_ok=True)
     return path
+
+
+def quiet_process_options() -> dict:
+    import subprocess
+    return {'creationflags':subprocess.CREATE_NO_WINDOW} if os.name=='nt' else {}

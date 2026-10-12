@@ -13,6 +13,7 @@ from .worker import RenderWorker
 from .ui_options import OptionsPanel
 from .ui_canvas import PreviewCanvas
 from .timing import trimmed_duration
+from .playback import PlaybackController
 
 MODES = {'Xem kết quả':'preview','Chọn crop':'crop','Chọn vùng blur':'blur','Vị trí logo':'logo','Vị trí watermark':'watermark','Vị trí text đầu':'intro'}
 
@@ -31,6 +32,10 @@ class VideoEditorApp(ctk.CTk):
         self.worker = RenderWorker()
         self.preview = PreviewController()
         self.loader = MediaLoader()
+        self.playback = PlaybackController()
+        self._play_generation = 0
+        self._play_requested = False
+        self._playback_options = None
         self._load_generation = self._preview_generation = 0
         self._preview_context = None
         self._display_mode = None
@@ -67,18 +72,24 @@ class VideoEditorApp(ctk.CTk):
         body.rowconfigure(0,weight=1);body.columnconfigure(0,weight=1)
         left = ctk.CTkFrame(body)
         left.grid(row=0,column=0,sticky='nsew',padx=(0,8));left.columnconfigure(0,weight=1);left.rowconfigure(2,weight=1)
-        self.info_label = ctk.CTkLabel(left,text='Ảnh xem trước • không phát realtime',anchor='w')
+        self.info_label = ctk.CTkLabel(left,text='Preview • kéo chọn khi tạm dừng',anchor='w')
         self.info_label.grid(row=0,column=0,sticky='ew',padx=10,pady=4)
         self.mode_menu = ctk.CTkOptionMenu(left,values=list(MODES),variable=self.mode_var,command=self.selection_mode_changed)
         self.mode_menu.grid(row=1,column=0,sticky='ew',padx=10,pady=4)
         self.preview_canvas = PreviewCanvas(left,self._selected)
         self.preview_canvas.grid(row=2,column=0,sticky='nsew',padx=10,pady=4)
-        self.timeline = ctk.CTkSlider(left,from_=0,to=1,variable=self.time_var,command=lambda value:self.options_changed('time'))
+        self.timeline = ctk.CTkSlider(left,from_=0,to=1,variable=self.time_var,command=self._timeline_changed)
         self.timeline.grid(row=3,column=0,sticky='ew',padx=14,pady=8)
         self.time_label = ctk.CTkLabel(left,text='0.00 s (thời gian đầu ra)')
         self.time_label.grid(row=4,column=0,padx=10)
-        self.help_label = ctk.CTkLabel(left,text='Crop: kéo vùng trên ảnh nguồn sau lật.\nBlur/logo/text: chọn trên ảnh sau crop.\nChọn “Xem kết quả” để thấy đầy đủ hiệu ứng.',justify='left',anchor='w')
-        self.help_label.grid(row=5,column=0,sticky='ew',padx=10,pady=8)
+        play_controls = ctk.CTkFrame(left,fg_color='transparent')
+        play_controls.grid(row=5,column=0,pady=4)
+        self.play_button=ctk.CTkButton(play_controls,text='Phát preview',command=self.start_playback,state='disabled',width=135)
+        self.play_button.grid(row=0,column=0,padx=4)
+        self.pause_button=ctk.CTkButton(play_controls,text='Tạm dừng',command=self.pause_playback,state='disabled',width=135)
+        self.pause_button.grid(row=0,column=1,padx=4)
+        self.help_label = ctk.CTkLabel(left,text='Kéo bên trong vùng để di chuyển; kéo góc/cạnh để resize.\nLogo/text/blur dùng ảnh sau crop; crop dùng ảnh sau lật.\nPreview sẽ chuẩn bị lại sau khi đổi hiệu ứng.',justify='left',anchor='w')
+        self.help_label.grid(row=6,column=0,sticky='ew',padx=10,pady=8)
         self.options = OptionsPanel(body,self.options_changed)
         self.options.grid(row=0,column=1,sticky='ns')
         bottom = ctk.CTkFrame(self)
@@ -100,11 +111,14 @@ class VideoEditorApp(ctk.CTk):
 
     def load_video(self,path):
         if self.worker.running or self._closing: return
+        self._play_requested=False;self._playback_options=None
+        self._play_generation=self.playback.invalidate()
         self.source_path = Path(path)
         self.source_var.set(str(path))
         self.media_info = None
         self.output_name_var.set(default_output(Path(path),Path('.')).name)
         self.export_button.configure(state='disabled')
+        self.play_button.configure(state='disabled');self.pause_button.configure(state='disabled')
         self._invalidate_preview()
         self.preview_canvas.clear()
         self._warning = ''
@@ -129,6 +143,11 @@ class VideoEditorApp(ctk.CTk):
     def options_changed(self,reason):
         if self._closing or self.worker.running: return
         self._last_terminal = None
+        self._play_requested=False
+        if reason in ('time','mode'): self.playback.pause()
+        else:
+            self._play_generation=self.playback.invalidate();self._playback_options=None
+        self._play_controls()
         self._invalidate_preview()
         if reason in ('crop','flip'):
             self._warning = 'Crop/lật đã đổi: chọn lại vùng blur và vị trí logo/text trước khi bật lại.'
@@ -174,6 +193,63 @@ class VideoEditorApp(ctk.CTk):
         except (ValueError,OSError) as exc:
             self.status_var.set(str(exc))
 
+    def _timeline_changed(self,value):
+        self.options_changed('time')
+
+    def _play_controls(self):
+        available=self.media_info is not None and not self.worker.running and not self._closing
+        self.play_button.configure(state='normal' if available and not self._play_requested else 'disabled')
+        self.pause_button.configure(state='normal' if available and self._play_requested else 'disabled',text='Tạm dừng' if self.playback.ready else 'Hủy chuẩn bị')
+
+    def start_playback(self):
+        if self.media_info is None or self.worker.running or self._closing: return
+        try:
+            options=self.options.read_options()
+            validate_options(options,self.media_info.width,self.media_info.height,self.media_info.duration)
+            self._last_terminal=None;self._warning=''
+            self._invalidate_preview()
+            self.mode_var.set('Xem kết quả')
+            self._play_requested=True
+            self.timeline.configure(to=max(.001,trimmed_duration(options,self.media_info.duration)-1/self.media_info.fps))
+            if not self.playback.ready or options!=self._playback_options:
+                self._play_generation=self.playback.prepare(self.source_path,self.media_info,options)
+                self._playback_options=options
+                self.status_var.set('Đang chuẩn bị preview có hiệu ứng…')
+            else:
+                self.playback.play(min(self.time_var.get(),max(0,self.playback.duration-1/self.media_info.fps)))
+                self.status_var.set('Đang phát preview')
+            self._play_controls()
+        except (ValueError,OSError,RuntimeError) as exc:
+            self._play_requested=False;self._play_controls()
+            self.status_var.set(str(exc))
+
+    def pause_playback(self):
+        self._play_requested=False
+        if self.playback.ready: self.playback.pause()
+        else: self._play_generation=self.playback.invalidate();self._playback_options=None
+        self._play_controls()
+        self._invalidate_preview()
+        self._request_preview()
+        self.status_var.set('Đã tạm dừng preview; có thể kéo chỉnh vùng')
+
+    def _handle_playback_event(self,event):
+        if event.kind=='progress' and self._play_requested:
+            self.progress.set(event.progress)
+            self.status_var.set(f'Đang chuẩn bị preview: {event.progress*100:.1f}%')
+        elif event.kind=='ready' and self._play_requested:
+            self.playback.play(min(self.time_var.get(),max(0,self.playback.duration-1/self.media_info.fps)))
+            self.progress.set(0);self.status_var.set('Đang phát preview');self._play_controls()
+        elif event.kind=='frame' and self._play_requested:
+            self.preview_canvas.set_image(event.image)
+            self.preview_canvas.enabled=False
+            self.time_var.set(event.time)
+            self.time_label.configure(text=f'{event.time:.2f} s (thời gian đầu ra)')
+        elif event.kind in ('completed','error'):
+            self._play_requested=False;self._play_controls()
+            if event.kind=='completed': self.time_var.set(0)
+            self._request_preview()
+            self.status_var.set(event.message if event.kind=='error' else 'Preview đã kết thúc')
+
     def _selected(self,kind,region):
         if self._display_mode != kind or self.worker.running: return
         self.options.apply_region(kind,region)
@@ -193,6 +269,8 @@ class VideoEditorApp(ctk.CTk):
             except FileExistsError:
                 if not messagebox.askyesno('Xác nhận ghi đè',f'File đã tồn tại:\n{destination}\n\nThay thế sau khi xuất thành công?',parent=self): return
                 reservation = reserve_output(self.source_path,destination,True)
+            self._play_requested=False;self._playback_options=None
+            self._play_generation=self.playback.invalidate()
             self._invalidate_preview()
             self._last_terminal = None
             self.worker.start(self.source_path,self.media_info,options,reservation)
@@ -216,6 +294,7 @@ class VideoEditorApp(ctk.CTk):
         self.preview_canvas.enabled = not busy and self._display_mode is not None
         self.export_button.configure(state='disabled' if busy or self.media_info is None else 'normal')
         self.cancel_button.configure(state='normal' if busy else 'disabled')
+        self._play_controls()
 
     def _handle_worker_event(self,event):
         if event.kind == 'progress':
@@ -247,6 +326,7 @@ class VideoEditorApp(ctk.CTk):
                 self.info_label.configure(text=f'{result.info.width} × {result.info.height} • {result.info.duration:.2f} s • {result.info.fps:g} fps')
                 self.options.set_media(result.info)
                 self.export_button.configure(state='normal')
+                self._play_controls()
         for result in self.preview.poll():
             if result.generation == self._preview_generation and not self._closing:
                 if result.error: self.status_var.set(result.error)
@@ -263,7 +343,13 @@ class VideoEditorApp(ctk.CTk):
                         self.status_var.set(self._warning or 'Ảnh xem trước đã cập nhật')
             if result.image: result.image.close()
         for event in self.worker.poll(): self._handle_worker_event(event)
-        if self._closing and not self.worker.running and not self.preview.busy and not self.loader.busy:
+        for event in self.playback.poll():
+            try:
+                if event.generation==self._play_generation and not self._closing:
+                    self._handle_playback_event(event)
+            finally:
+                if event.image is not None: event.image.close()
+        if self._closing and not self.worker.running and not self.preview.busy and not self.loader.busy and not self.playback.busy:
             self._finish_close();return
         self._poll_after = self.after(40,self._poll)
 
@@ -275,10 +361,12 @@ class VideoEditorApp(ctk.CTk):
         self.worker.cancel()
         self.preview.close()
         self.loader.close()
+        self._play_requested=False
+        self.playback.close()
         self._set_busy(True)
         self.cancel_button.configure(state='disabled')
         self.status_var.set('Đang dừng tác vụ trước khi thoát…')
-        if not self.worker.running and not self.preview.busy and not self.loader.busy: self._finish_close()
+        if not self.worker.running and not self.preview.busy and not self.loader.busy and not self.playback.busy: self._finish_close()
 
     def _finish_close(self):
         if self._destroyed: return

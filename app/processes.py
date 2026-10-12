@@ -1,5 +1,6 @@
 """Cancellable native calls with timeout and unconditional child reaping."""
 import subprocess
+from .resources import quiet_process_options
 import threading
 import time
 
@@ -11,7 +12,7 @@ class MediaCancelled(ValueError):
 def run_media_process(args: list[str], timeout: float, cancel: threading.Event | None = None) -> subprocess.CompletedProcess:
     if cancel is not None and cancel.is_set():
         raise MediaCancelled('Tác vụ media đã hủy')
-    with subprocess.Popen(args,stdout=subprocess.PIPE,stderr=subprocess.PIPE) as process:
+    with subprocess.Popen(args,stdout=subprocess.PIPE,stderr=subprocess.PIPE,**quiet_process_options()) as process:
         deadline = time.monotonic() + timeout
         try:
             while True:

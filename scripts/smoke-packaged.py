@@ -44,6 +44,12 @@ def main():
         gui=root/'gui.json'
         run([exe,'--gui-smoke-test','--report',gui],env=restricted,cwd=app_dir)
         assert json.loads(gui.read_text(encoding='utf-8'))=={'ok':True,'gui':True}
+        playback=root/'playback.json'
+        playback_env=restricted.copy();playback_env['SDL_AUDIODRIVER']='dummy'
+        run([exe,'--playback-smoke-test',source,'--report',playback],env=playback_env,cwd=app_dir)
+        played=json.loads(playback.read_text(encoding='utf-8'))
+        assert played['ok'] and played['playback'] and played['frames']>=4 and played['audio'],played
+        assert abs(played['duration']-1)<.04,played
         failure=root/'collision.json'
         original=source.read_bytes()
         process=subprocess.run([str(exe),'--smoke-test',str(source),'--output-dir',str(input_dir),'--report',str(failure)],env=restricted,cwd=app_dir,timeout=30)

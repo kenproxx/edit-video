@@ -182,6 +182,9 @@ FILTER_TABLE_8 = '''Filters:
   A = Audio input/output
   V = Video input/output
   ------
+ .. adelay            A->A       Delay audio.
+ .. apad              A->A       Pad audio.
+ .. trim              V->V       Trim video.
  .. asetpts           A->A       Set timestamps for the output audio frame.
  .. atempo            A->A       Adjust audio tempo.
  .. atrim             A->A       Pick one continuous section from the input.
@@ -231,3 +234,15 @@ def test_tool_validation_still_rejects_missing_capabilities(monkeypatch,missing)
     with pytest.raises(ValueError,match=missing) as error:
         selftest.verify_media_tools()
     assert str(error.value).split(': ',1)[1]==missing
+
+
+def test_embedded_playback_smoke_cli(clips,tmp_path,monkeypatch):
+    assert os.environ.get('DISPLAY') or os.name=='nt','Playback CLI needs an actual display'
+    monkeypatch.setenv('SDL_AUDIODRIVER','dummy')
+    source=tmp_path/'movie.mp4';source.write_bytes(clips['source'].read_bytes())
+    report=tmp_path/'playback.json'
+    result=subprocess.run([sys.executable,str(ROOT/'main.py'),'--playback-smoke-test',str(source),'--report',str(report)],capture_output=True,text=True,timeout=30)
+    assert result.returncode==0,result.stderr
+    data=json.loads(report.read_text(encoding='utf-8'))
+    assert data['ok'] and data['playback'] and data['frames']>=4 and data['audio']
+    assert data['duration']==pytest.approx(1,abs=.04)

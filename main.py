@@ -10,11 +10,12 @@ def main(argv=None) -> int:
     modes = parser.add_mutually_exclusive_group()
     modes.add_argument('--smoke-test',type=Path,metavar='INPUT',help='Export with bundled tools without opening the GUI')
     modes.add_argument('--gui-smoke-test',action='store_true',help='Open and close the native GUI')
+    modes.add_argument('--playback-smoke-test',type=Path,metavar='INPUT',help='Exercise embedded playback, trim, pause and seek')
     parser.add_argument('--output-dir',type=Path)
     parser.add_argument('--report',type=Path,help='JSON result file (required for packaged smoke tests)')
     args = parser.parse_args(argv)
     if args.smoke_test is not None and args.output_dir is None: parser.error('--smoke-test requires --output-dir')
-    if args.smoke_test is not None or args.gui_smoke_test:
+    if args.smoke_test is not None or args.gui_smoke_test or args.playback_smoke_test is not None:
         report = None
         try:
             if args.report is not None:
@@ -28,6 +29,9 @@ def main(argv=None) -> int:
             if args.smoke_test is not None:
                 from app.selftest import smoke_export
                 result = smoke_export(args.smoke_test,args.output_dir)
+            elif args.playback_smoke_test is not None:
+                from app.selftest import smoke_embedded_playback
+                result = smoke_embedded_playback(args.playback_smoke_test)
             else:
                 from app.ui import VideoEditorApp
                 app = VideoEditorApp()

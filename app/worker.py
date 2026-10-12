@@ -10,7 +10,7 @@ from .media import MediaInfo
 from .models import EditOptions
 from .output import OutputReservation, publish_output
 from .render import prepare_render
-from .resources import user_data_dir
+from .resources import user_data_dir,quiet_process_options
 
 @dataclass(frozen=True)
 class WorkerEvent:
@@ -49,7 +49,7 @@ class RenderWorker:
             self._events.clear()
             return result
 
-    def start(self, source: Path, info: MediaInfo, options: EditOptions, reservation: OutputReservation) -> None:
+    def start(self, source: Path, info: MediaInfo, options: EditOptions, reservation: OutputReservation, preview: bool = False) -> None:
         with self._lock:
             if self._running:
                 raise RuntimeError('Một tác vụ xuất đang chạy')
@@ -60,13 +60,13 @@ class RenderWorker:
             self._events.clear()
             self._progress = None
             self._process = None
-            self._thread = threading.Thread(target=self._run, args=(source, info, options, reservation), daemon=True)
+            self._thread = threading.Thread(target=self._run, args=(source, info, options, reservation, preview), daemon=True)
             self._thread.start()
 
     def cancel(self) -> None:
         self._cancel.set()
 
-    def _run(self, source, info, options, reservation):
+    def _run(self, source, info, options, reservation, preview=False):
         temp = None
         reader = None
         process = None
@@ -85,11 +85,11 @@ class RenderWorker:
             os.close(fd)
             temp = Path(name)
             with tempfile.TemporaryDirectory(prefix='render-', dir=root) as workspace:
-                prepared = prepare_render(source, info, options, temp, Path(workspace))
+                prepared = prepare_render(source, info, options, temp, Path(workspace),preview=True) if preview else prepare_render(source, info, options, temp, Path(workspace))
                 if self._cancel.is_set():
                     terminal = WorkerEvent('cancelled')
                 else:
-                    process = subprocess.Popen(prepared.args, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, encoding='utf-8', errors='replace', bufsize=1)
+                    process = subprocess.Popen(prepared.args, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, encoding='utf-8', errors='replace', bufsize=1,**quiet_process_options())
                     with self._lock:
                         self._process = process
                     def read_progress():

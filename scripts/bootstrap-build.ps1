@@ -110,7 +110,7 @@ try {
     $ffmpegRoot = Join-Path $unpack $manifest.ffmpeg.archive_root
     $tools = Join-Path $root 'tools'
     New-Item -ItemType Directory -Path $tools -Force | Out-Null
-    foreach ($tool in @('ffmpeg.exe','ffprobe.exe')) {
+    foreach ($tool in @('ffmpeg.exe','ffprobe.exe','ffplay.exe')) {
         Copy-Item -LiteralPath (Join-Path $ffmpegRoot "bin\$tool") -Destination (Join-Path $tools $tool) -Force
     }
     $licenses = Join-Path $root 'build\licenses'

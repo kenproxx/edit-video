@@ -75,8 +75,17 @@ def _pipeline(source: Path, info: MediaInfo, options: EditOptions, workspace: Pa
     return args, ';'.join(graph)
 
 
-def prepare_render(source: Path, info: MediaInfo, options: EditOptions, destination: Path, workspace: Path) -> PreparedRender:
+def preview_size(info: MediaInfo, options: EditOptions) -> tuple[int,int]:
+    width,height=(options.crop.width,options.crop.height) if options.crop else (info.width//2*2,info.height//2*2)
+    factor=min(1,960/width,540/height)
+    return max(2,int(width*factor)//2*2),max(2,int(height*factor)//2*2)
+
+
+def prepare_render(source: Path, info: MediaInfo, options: EditOptions, destination: Path, workspace: Path, preview: bool = False) -> PreparedRender:
     args, graph = _pipeline(source, info, options, workspace)
+    if preview:
+        width,height=preview_size(info,options)
+        graph=graph.replace('format=yuv420p[vout]',f'scale={width}:{height},setsar=1,format=yuv420p[vout]')
     start,end = source_interval(options,info.duration)
     duration = trimmed_duration(options,info.duration)
     has_audio = info.has_audio and end > info.audio_offset
@@ -87,13 +96,18 @@ def prepare_render(source: Path, info: MediaInfo, options: EditOptions, destinat
         else:
             trim = f'atrim=start={-info.audio_offset:.9g},' if info.audio_offset < 0 else ''
         offset = max(0, info.audio_offset-start) / options.speed
-        graph += f';[0:a:0]{trim}asetpts=PTS-STARTPTS,{_audio_speed(options.speed)},asetpts=PTS+{offset:.9g}/TB[aout]'
+        if preview:
+            # Audio-only playback starts at zero: include the source delay as
+            # actual silence, rather than relying on container timestamps.
+            graph += f';[0:a:0]{trim}asetpts=PTS-STARTPTS,{_audio_speed(options.speed)},adelay={offset*1000:.9g}:all=1,apad=whole_dur={duration:.9g},asetpts=N/SR/TB[aout]'
+        else:
+            graph += f';[0:a:0]{trim}asetpts=PTS-STARTPTS,{_audio_speed(options.speed)},asetpts=PTS+{offset:.9g}/TB[aout]'
     args += ['-filter_complex_threads', '2', '-filter_complex', graph, '-map', '[vout]']
     if has_audio:
         args += ['-map', '[aout]', '-c:a', 'aac', '-b:a', '192k']
     else:
         args += ['-an']
-    args += ['-c:v', 'libx264', '-threads', '2', '-crf', '20', '-preset', 'medium', '-pix_fmt', 'yuv420p', '-fps_mode', 'passthrough', '-t', f'{duration:.9g}', '-map_metadata', '-1', '-map_chapters', '-1', '-metadata:s:v:0', 'rotate=0', '-movflags', '+faststart', '-progress', 'pipe:1', '-nostats', str(destination.resolve())]
+    args += ['-c:v', 'libx264', '-threads', '2', '-crf', '28' if preview else '20', '-preset', 'ultrafast' if preview else 'medium', '-pix_fmt', 'yuv420p', '-fps_mode', 'passthrough', '-t', f'{duration:.9g}', '-map_metadata', '-1', '-map_chapters', '-1', '-metadata:s:v:0', 'rotate=0', '-movflags', '+faststart', '-progress', 'pipe:1', '-nostats', str(destination.resolve())]
     return PreparedRender(args, duration)
 
 
