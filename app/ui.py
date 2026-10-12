@@ -12,6 +12,7 @@ from .preview import PreviewController
 from .worker import RenderWorker
 from .ui_options import OptionsPanel
 from .ui_canvas import PreviewCanvas
+from .timing import trimmed_duration
 
 MODES = {'Xem kết quả':'preview','Chọn crop':'crop','Chọn vùng blur':'blur','Vị trí logo':'logo','Vị trí watermark':'watermark','Vị trí text đầu':'intro'}
 
@@ -155,12 +156,19 @@ class VideoEditorApp(ctk.CTk):
             else:
                 options = self.options.read_options(exclude=mode)
             validate_options(options,self.media_info.width,self.media_info.height,self.media_info.duration)
-            end = max(0,self.media_info.duration/options.speed - 1/self.media_info.fps)
+            end = max(0,trimmed_duration(options,self.media_info.duration) - 1/self.media_info.fps)
             self.timeline.configure(to=max(.001,end))
             time = min(max(0,self.time_var.get()),end)
             self.time_var.set(time)
             self.time_label.configure(text=f'{time:.2f} s (thời gian đầu ra)')
-            self._preview_context = (mode,options,selection)
+            overlay=None
+            if mode in ('logo','watermark','intro'):
+                width,height=(options.crop.width,options.crop.height) if options.crop else (self.media_info.width//2*2,self.media_info.height//2*2)
+                snapshot=self.options.selection_snapshot(mode,(width,height))
+                if snapshot: selection,overlay=snapshot
+            if self._preview_context is not None and len(self._preview_context)>3 and self._preview_context[3] is not None:
+                self._preview_context[3].close()
+            self._preview_context = (mode,options,selection,overlay)
             self._preview_generation = self.preview.request(self.source_path,self.media_info,options,time)
             if not self._warning and self._last_terminal is None: self.status_var.set('Đang cập nhật ảnh xem trước…')
         except (ValueError,OSError) as exc:
@@ -243,12 +251,14 @@ class VideoEditorApp(ctk.CTk):
             if result.generation == self._preview_generation and not self._closing:
                 if result.error: self.status_var.set(result.error)
                 else:
-                    mode,options,selection = self._preview_context
+                    mode,options,selection,overlay = self._preview_context
                     self._display_mode = mode
                     self.preview_canvas.mode = mode
                     self.preview_canvas.set_image(result.image)
                     self.preview_canvas.enabled = not self.worker.running
-                    if mode == 'crop' and selection is not None: self.preview_canvas.set_selection(selection)
+                    if selection is not None:
+                        if overlay is not None: self.preview_canvas.set_overlay(overlay,selection)
+                        else: self.preview_canvas.set_selection(selection)
                     if self._last_terminal is None:
                         self.status_var.set(self._warning or 'Ảnh xem trước đã cập nhật')
             if result.image: result.image.close()
@@ -275,4 +285,5 @@ class VideoEditorApp(ctk.CTk):
         self._destroyed = True
         if self._poll_after: self.after_cancel(self._poll_after)
         self.preview_canvas.clear()
+        if self._preview_context is not None and self._preview_context[3] is not None: self._preview_context[3].close()
         self.destroy()

@@ -336,3 +336,51 @@ def test_terminal_event_restores_blur_selection(editor,clips,kind):
     canvas.press(SimpleNamespace(x=box.x+box.width//4,y=box.y+box.height//4))
     canvas.release(SimpleNamespace(x=box.x+box.width//2,y=box.y+box.height//2))
     assert editor.options.read_options().blur is not None
+
+
+def canvas_point(canvas,x,y):
+    box=canvas.image_box;w,h=canvas.image_size
+    return SimpleNamespace(x=box.x+x*box.width/w,y=box.y+y*box.height/h)
+
+
+def test_trim_controls_and_output_timeline(editor,clips):
+    load(editor,clips['source'])
+    panel=editor.options
+    panel.vars['trim_enabled'].set(True)
+    panel.vars['trim_start'].set('00:01');panel.vars['trim_end'].set('00:03')
+    panel.vars['speed'].set('2')
+    assert panel.read_options().trim_start==1 and panel.read_options().trim_end==3
+    spin(editor,lambda:editor._display_mode=='preview')
+    assert editor.timeline.cget('to')==pytest.approx(1-1/30)
+
+
+def test_crop_can_resize_corner_and_move_existing_frame(editor,clips):
+    load(editor,clips['source'])
+    editor.options.apply_region('crop',Rect(40,40,120,100))
+    editor.mode_var.set('crop');editor.selection_mode_changed()
+    spin(editor,lambda:editor._display_mode=='crop')
+    canvas=editor.preview_canvas
+    canvas.press(canvas_point(canvas,160,140));canvas.drag(canvas_point(canvas,200,180));canvas.release(canvas_point(canvas,200,180))
+    assert editor.options.read_options().crop==Rect(40,40,160,140)
+    spin(editor,lambda:editor._display_mode=='crop')
+    canvas.press(canvas_point(canvas,100,100));canvas.drag(canvas_point(canvas,120,110));canvas.release(canvas_point(canvas,120,110))
+    assert editor.options.read_options().crop==Rect(60,50,160,140)
+
+
+def test_logo_drag_and_resize_directly(editor,clips,tmp_path):
+    load(editor,clips['source'])
+    path=tmp_path/'logo.png';Image.new('RGBA',(20,10),'white').save(path)
+    panel=editor.options
+    panel.vars['logo_path'].set(str(path));panel.vars['logo_width'].set('40')
+    panel.apply_region('logo',(40,40))
+    editor.mode_var.set('logo');editor.selection_mode_changed()
+    spin(editor,lambda:editor._display_mode=='logo')
+    canvas=editor.preview_canvas
+    assert isinstance(canvas._selection,Rect)
+    canvas.press(canvas_point(canvas,80,60));canvas.drag(canvas_point(canvas,100,90));canvas.release(canvas_point(canvas,100,90))
+    logo=panel.read_options().logo
+    assert (logo.x,logo.y,logo.width,logo.height)==(40,40,60,50)
+    spin(editor,lambda:editor._display_mode=='logo')
+    canvas.press(canvas_point(canvas,60,60));canvas.release(canvas_point(canvas,100,80))
+    logo=panel.read_options().logo
+    assert (logo.x,logo.y,logo.width,logo.height)==(80,60,60,50)

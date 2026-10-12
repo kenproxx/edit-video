@@ -94,12 +94,15 @@ class OptionsPanel(ctk.CTkScrollableFrame):
         self.changed = changed
         self._suspend = 0
         self.info = None
-        defaults = dict(speed='1',crop_x='0',crop_y='0',crop_width='0',crop_height='0',blur_x='0',blur_y='0',blur_width='40',blur_height='40',blur_strength='10',logo_path='',logo_x='0',logo_y='0',logo_width='64',logo_opacity='1',intro_duration='1')
+        defaults = dict(speed='1',crop_x='0',crop_y='0',crop_width='0',crop_height='0',blur_x='0',blur_y='0',blur_width='40',blur_height='40',blur_strength='10',logo_path='',logo_x='0',logo_y='0',logo_width='64',logo_height='',logo_opacity='1',trim_start='00:00',trim_end='00:00',intro_duration='1')
         self.vars = {n:tk.StringVar(value=v) for n,v in defaults.items()}
-        for n in ('flip_horizontal','flip_vertical','crop_enabled','blur_enabled','logo_enabled'):
+        for n in ('flip_horizontal','flip_vertical','crop_enabled','blur_enabled','logo_enabled','trim_enabled'):
             self.vars[n] = tk.BooleanVar(value=False)
         self.controls = []
         self._row = 0
+        self._check('trim_enabled','Cắt đoạn video nguồn')
+        self._entry('trim_start','Từ (phút:giây)')
+        self._entry('trim_end','Tới (phút:giây)')
         self._entry('speed','Tốc độ (0.25–4)')
         self._check('flip_horizontal','Lật ngang')
         self._check('flip_vertical','Lật dọc')
@@ -120,8 +123,8 @@ class OptionsPanel(ctk.CTkScrollableFrame):
         button = ctk.CTkButton(self,text='Chọn logo',command=self.choose_logo)
         button.grid(row=self._row,column=0,sticky='ew',pady=4,padx=3);self._row+=1
         self.controls.append(button)
-        for key in ('x','y','width','opacity'):
-            self._entry('logo_'+key,'Logo '+{'width':'rộng (px)','opacity':'độ đậm 0–1'}.get(key,key.upper()))
+        for key in ('x','y','width','height','opacity'):
+            self._entry('logo_'+key,'Logo '+{'width':'rộng (px)','height':'cao (để trống: giữ tỷ lệ)','opacity':'độ đậm 0–1'}.get(key,key.upper()))
         self.text_panels = {}
         for key,title in [('watermark','Bật watermark chữ toàn video'),('intro','Bật chữ đầu video')]:
             panel = TextPanel(self,title,self._notify)
@@ -169,8 +172,11 @@ class OptionsPanel(ctk.CTkScrollableFrame):
     def set_media(self,info):
         self.info = info
         with self.batch():
+            from .timing import format_time
+            self.vars['trim_start'].set('00:00');self.vars['trim_end'].set(format_time(info.duration))
+            self.vars['logo_height'].set('')
             self.vars['speed'].set('1')
-            for name in ('flip_horizontal','flip_vertical','crop_enabled','blur_enabled','logo_enabled'):
+            for name in ('flip_horizontal','flip_vertical','crop_enabled','blur_enabled','logo_enabled','trim_enabled'):
                 self.vars[name].set(False)
             for prefix in ('crop','blur','logo'):
                 self.vars[prefix+'_x'].set('0');self.vars[prefix+'_y'].set('0')
@@ -192,10 +198,25 @@ class OptionsPanel(ctk.CTkScrollableFrame):
                 for field in ('x','y','width','height'): self.vars[f'{kind}_{field}'].set(str(getattr(region,field)))
                 self.vars[kind+'_enabled'].set(True)
             elif kind == 'logo':
-                self.vars['logo_x'].set(str(region[0]));self.vars['logo_y'].set(str(region[1]));self.vars['logo_enabled'].set(True)
+                if isinstance(region,Rect):
+                    for field in ('x','y','width','height'): self.vars['logo_'+field].set(str(getattr(region,field)))
+                else:
+                    self.vars['logo_x'].set(str(region[0]));self.vars['logo_y'].set(str(region[1]))
+                self.vars['logo_enabled'].set(True)
             else:
                 panel = self.text_panels[kind]
-                panel.vars['x'].set(str(region[0]));panel.vars['y'].set(str(region[1]));panel.vars['enabled'].set(True)
+                if isinstance(region,Rect):
+                    from .overlays import text_bounds
+                    from PIL import ImageFont
+                    overlay=panel.read()
+                    if overlay:
+                        w,h=text_bounds(overlay,ImageFont.truetype(str(overlay.font),overlay.size))[1]
+                        ratio=region.width/w if abs(region.width-w)>=abs(region.height-h) else region.height/h
+                        panel.vars['size'].set(str(max(1,round(overlay.size*ratio))))
+                    panel.vars['x'].set(str(region.x));panel.vars['y'].set(str(region.y))
+                else:
+                    panel.vars['x'].set(str(region[0]));panel.vars['y'].set(str(region[1]))
+                panel.vars['enabled'].set(True)
         if kind == 'crop': self._field_changed('crop_enabled')
         else: self._notify('edit')
 
@@ -204,7 +225,9 @@ class OptionsPanel(ctk.CTkScrollableFrame):
         if path: self.vars['logo_path'].set(path)
 
     def base_options(self):
-        return EditOptions(speed=float(self.vars['speed'].get().replace(',','.')),flip_horizontal=self.vars['flip_horizontal'].get(),flip_vertical=self.vars['flip_vertical'].get())
+        from .timing import parse_time
+        enabled=self.vars['trim_enabled'].get()
+        return EditOptions(speed=float(self.vars['speed'].get().replace(',','.')),flip_horizontal=self.vars['flip_horizontal'].get(),flip_vertical=self.vars['flip_vertical'].get(),trim_start=parse_time(self.vars['trim_start'].get()) if enabled else 0,trim_end=parse_time(self.vars['trim_end'].get()) if enabled else None)
 
     def read_options(self, exclude: str | None = None) -> EditOptions:
         try:
@@ -214,12 +237,46 @@ class OptionsPanel(ctk.CTkScrollableFrame):
                 return Rect(*(int(self.vars[prefix+'_'+field].get()) for field in ('x','y','width','height')))
             logo = None
             if exclude != 'logo' and self.vars['logo_enabled'].get():
-                logo = LogoOverlay(Path(self.vars['logo_path'].get()),int(self.vars['logo_x'].get()),int(self.vars['logo_y'].get()),int(self.vars['logo_width'].get()),float(self.vars['logo_opacity'].get().replace(',','.')))
+                logo = LogoOverlay(Path(self.vars['logo_path'].get()),int(self.vars['logo_x'].get()),int(self.vars['logo_y'].get()),int(self.vars['logo_width'].get()),float(self.vars['logo_opacity'].get().replace(',','.')),int(self.vars['logo_height'].get()) if self.vars['logo_height'].get().strip() else None)
             from dataclasses import replace
             intro = None if exclude == 'intro' else self.text_panels['intro'].read()
             return replace(base,crop=rect('crop'),blur=rect('blur'),blur_strength=int(self.vars['blur_strength'].get()) if exclude != 'blur' and self.vars['blur_enabled'].get() else 10,logo=logo,watermark=None if exclude == 'watermark' else self.text_panels['watermark'].read(),intro=intro,intro_duration=float(self.vars['intro_duration'].get().replace(',','.')) if intro else 1)
         except ValueError as exc:
             raise ValueError('Kiểm tra các ô số: X/Y/kích thước là số nguyên; tốc độ/thời gian/độ đậm là số thực') from exc
+
+    def selection_snapshot(self,kind,bounds):
+        from PIL import Image,ImageFont
+        from .overlays import text_bounds,write_text
+        from .resources import user_data_dir
+        import tempfile
+        width,height=bounds
+        def number(value,default):
+            try: return int(value)
+            except ValueError: return default
+        if kind=='logo':
+            if not self.vars['logo_enabled'].get(): return None
+            try:
+                with Image.open(self.vars['logo_path'].get()) as source: image=source.convert('RGBA')
+            except (OSError,ValueError): return None
+            w=max(1,min(width,number(self.vars['logo_width'].get(),64)))
+            h=max(1,min(height,number(self.vars['logo_height'].get(),round(image.height*w/image.width))))
+            x=max(0,min(width-w,number(self.vars['logo_x'].get(),0)))
+            y=max(0,min(height-h,number(self.vars['logo_y'].get(),0)))
+            try: opacity=max(0,min(1,float(self.vars['logo_opacity'].get().replace(',','.'))))
+            except ValueError: opacity=1
+            image.putalpha(image.getchannel('A').point(lambda value:round(value*opacity)))
+            return Rect(x,y,w,h),image
+        if kind in self.text_panels:
+            try:
+                overlay=self.text_panels[kind].read()
+                if overlay is None: return None
+                w,h=text_bounds(overlay,ImageFont.truetype(str(overlay.font),overlay.size))[1]
+                with tempfile.TemporaryDirectory(prefix='canvas-text-',dir=user_data_dir()) as directory:
+                    target=Path(directory)/'text.png';write_text(overlay,target)
+                    with Image.open(target) as source: image=source.convert('RGBA')
+                return Rect(overlay.x,overlay.y,w,h),image
+            except (OSError,ValueError): return None
+        return None
 
     def set_enabled(self,enabled):
         for widget in self.controls: widget.configure(state='normal' if enabled else 'disabled')
