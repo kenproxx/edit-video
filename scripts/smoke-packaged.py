@@ -98,6 +98,17 @@ def main():
         run([exe,'--playback-smoke-test',silent,'--audio-file',audio,'--report',inserted_play],env=playback_env,cwd=app_dir)
         inserted=json.loads(inserted_play.read_text(encoding='utf-8'))
         assert inserted['ok'] and inserted['audio'] and inserted['frames']>=4,inserted
+        batch_input=root/'thư mục video';batch_input.mkdir(exist_ok=True)
+        batch_output=root/'hàng loạt';batch_output.mkdir(exist_ok=True)
+        shutil.copy2(source,batch_input/'a.mp4')
+        run([args.ffmpeg.resolve(),'-v','error','-y','-i',source,'-vf','scale=160:120','-c:v','libx264','-threads','2','-c:a','aac',batch_input/'b.mov'])
+        (batch_input/'bad.mp4').write_bytes(b'broken fixture')
+        shutil.copy2(source,batch_input/'skip.mp4');(batch_output/'skip.mp4').write_bytes(b'keep existing')
+        batch_report=root/'batch.json'
+        run([exe,'--batch-smoke-test',batch_input,'--output-dir',batch_output,'--report',batch_report],env=restricted,cwd=app_dir)
+        batched=json.loads(batch_report.read_text(encoding='utf-8'))
+        assert batched['ok'] and batched['batch'] and batched['counts']=={'completed':2,'error':1,'skipped':1,'cancelled':0},batched
+        assert (batch_output/'skip.mp4').read_bytes()==b'keep existing'
         failure=root/'collision.json'
         original=source.read_bytes()
         process=subprocess.run([str(exe),'--smoke-test',str(source),'--output-dir',str(input_dir),'--report',str(failure)],env=restricted,cwd=app_dir,timeout=30)

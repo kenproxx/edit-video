@@ -473,3 +473,95 @@ def test_audio_duration_control_and_once_default(editor,clips):
     assert panel.read_options().audio_duration==1.5
     panel.set_media(probe(clips['source']))
     assert panel.read_options().audio_duration is None and not panel.read_options().audio_loop
+
+
+def test_folder_batch_export_and_preserve_edits_on_sample_change(editor,clips,tmp_path,monkeypatch):
+    folder=tmp_path/'input';folder.mkdir();output=tmp_path/'out';output.mkdir()
+    (folder/'a.mp4').write_bytes(clips['silent'].read_bytes());(folder/'b.mp4').write_bytes(clips['source'].read_bytes())
+    import app.ui as ui
+    monkeypatch.setattr(ui.filedialog,'askdirectory',lambda **kwargs:str(folder))
+    assert hasattr(editor,'choose_folder'),'Folder input control missing'
+    editor.choose_folder()
+    spin(editor,lambda:editor.media_info is not None and editor.preview_canvas.image_size is not None)
+    editor.options.vars['speed'].set('2');editor.options.vars['source_volume'].set('25')
+    editor.select_batch_sample('b.mp4')
+    spin(editor,lambda:editor.media_info is not None and editor.source_path.name=='b.mp4' and editor.preview_canvas.image_size is not None)
+    assert editor.options.read_options().speed==2 and editor.options.read_options().source_volume==.25
+    editor.output_dir_var.set(str(output));editor.start_export()
+    assert editor.folder_button.cget('state')=='disabled'
+    spin(editor,lambda:editor._last_batch is not None,timeout=25)
+    assert editor._last_batch.kind=='completed' and len(editor.batch.results)==2
+    assert all(r.status=='completed' for r in editor.batch.results)
+    assert editor.folder_button.cget('state')=='normal'
+    assert probe(output/'a.mp4').duration==pytest.approx(2,abs=.07)
+
+
+def test_batch_sample_invalid_fields_do_not_stop_gui_polling(editor,clips,tmp_path,monkeypatch):
+    folder=tmp_path/'input';folder.mkdir()
+    for name in ('a.mp4','b.mp4'): (folder/name).write_bytes(clips['silent'].read_bytes())
+    import app.ui as ui
+    monkeypatch.setattr(ui.filedialog,'askdirectory',lambda **kwargs:str(folder))
+    errors=[];editor.report_callback_exception=lambda *args:errors.append(args)
+    editor.choose_folder();spin(editor,lambda:editor.media_info is not None)
+    editor.options.vars['speed'].set('invalid')
+    editor.select_batch_sample('b.mp4')
+    spin(editor,lambda:editor.media_info is not None)
+    editor.options.vars['speed'].set('2')
+    spin(editor,lambda:editor.preview_canvas.image_size is not None)
+    assert not errors
+
+
+def test_batch_progress_does_not_regress_when_item_events_are_coalesced(editor):
+    from app.batch import BatchEvent
+    editor._handle_batch_event(BatchEvent('progress',2,3,.6,Path('b.mp4')))
+    editor._handle_batch_event(BatchEvent('item',1,3,1/3,Path('a.mp4')))
+    assert editor.progress.get()==.6 and 'b.mp4' in editor.status_var.get()
+
+
+def test_close_during_folder_batch_reaps_renderer(editor,clips,tmp_path,monkeypatch):
+    import subprocess
+    folder=tmp_path/'input';folder.mkdir();output=tmp_path/'out';output.mkdir()
+    subprocess.run(['ffmpeg','-v','error','-y','-stream_loop','-1','-i',str(clips['source']),'-t','120','-c','copy',str(folder/'a.mp4')],check=True)
+    (folder/'b.mp4').write_bytes(clips['silent'].read_bytes())
+    import app.ui as ui
+    monkeypatch.setattr(ui.filedialog,'askdirectory',lambda **kwargs:str(folder))
+    editor.choose_folder();spin(editor,lambda:editor.media_info is not None)
+    editor.options.vars['speed'].set('0.25');editor.output_dir_var.set(str(output));editor.start_export()
+    spin(editor,lambda:editor.batch._worker._process is not None)
+    process=editor.batch._worker._process
+    editor.request_close();spin(editor,lambda:editor._destroyed)
+    assert not editor.batch.running and process.poll() is not None
+    assert not list(output.iterdir())
+
+
+@pytest.mark.parametrize('corrupt',[False,True])
+def test_batch_sample_rapid_or_failed_selection_keeps_edits(editor,clips,tmp_path,monkeypatch,corrupt):
+    folder=tmp_path/'input';folder.mkdir()
+    (folder/'a.mp4').write_bytes(clips['silent'].read_bytes())
+    (folder/'b.mp4').write_bytes(b'broken' if corrupt else clips['source'].read_bytes())
+    import app.ui as ui
+    monkeypatch.setattr(ui.filedialog,'askdirectory',lambda **kwargs:str(folder))
+    editor.choose_folder();spin(editor,lambda:editor.media_info is not None)
+    editor.options.vars['speed'].set('2');editor.options.vars['source_volume'].set('25')
+    editor.select_batch_sample('b.mp4')
+    if corrupt: spin(editor,lambda:bool(editor._test_messages))
+    editor.select_batch_sample('a.mp4')
+    spin(editor,lambda:editor.media_info is not None)
+    options=editor.options.read_options()
+    assert options.speed==2 and options.source_volume==.25
+
+
+def test_failed_batch_adaptation_retries_geometry_after_correcting_fields(editor,clips,tmp_path,monkeypatch):
+    import subprocess
+    folder=tmp_path/'input';folder.mkdir()
+    (folder/'a.mp4').write_bytes(clips['silent'].read_bytes())
+    subprocess.run(['ffmpeg','-v','error','-y','-i',str(clips['silent']),'-vf','scale=160:120','-c:v','libx264','-threads','2',str(folder/'b.mp4')],check=True)
+    import app.ui as ui
+    monkeypatch.setattr(ui.filedialog,'askdirectory',lambda **kwargs:str(folder))
+    editor.choose_folder();spin(editor,lambda:editor.media_info is not None)
+    editor.options.apply_region('crop',Rect(0,0,160,120));editor.options.vars['speed'].set('invalid')
+    editor.select_batch_sample('b.mp4');spin(editor,lambda:editor.media_info is not None)
+    editor.options.vars['speed'].set('2')
+    spin(editor,lambda:editor.preview_canvas.image_size is not None)
+    assert editor.options.read_options().crop==Rect(0,0,80,60)
+    assert editor._sample_reference is None

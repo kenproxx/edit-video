@@ -200,6 +200,21 @@ class OptionsPanel(ctk.CTkScrollableFrame):
                 panel.vars['enabled'].set(False);panel.vars['x'].set('0');panel.vars['y'].set('0')
         self._notify('media')
 
+    def rescale_for_media(self,reference,info):
+        from .batch import adapt_options
+        options=adapt_options(self.read_options(),reference,info)
+        self.info=info
+        with self.batch():
+            for kind in ('crop','blur','logo'):
+                value=getattr(options,kind)
+                if value is not None:
+                    for name in ('x','y','width','height'): self.vars[kind+'_'+name].set(str(getattr(value,name)))
+            for kind in ('watermark','intro'):
+                value=getattr(options,kind)
+                if value is not None:
+                    for name in ('x','y','size','stroke_width'): self.text_panels[kind].vars[name].set(str(getattr(value,name)))
+        self._notify('media')
+
     def set_preset(self,ratio):
         if self.info is None: return
         self.apply_region('crop',preset_crop(self.info.width,self.info.height,tuple(map(int,ratio.split(':')))))

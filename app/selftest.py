@@ -124,3 +124,32 @@ def smoke_embedded_playback(source: Path, audio_path: Path | None = None) -> dic
     if state['phase']!='closed' or state['frames']<4 or app.playback.busy or any(p.poll() is None for p in processes):
         raise ValueError('Playback did not close and reap native processes')
     return {'ok':True,'playback':True,'frames':state['frames'],'audio':state['audio'],'duration':state['duration']}
+
+
+def smoke_batch(folder: Path,directory: Path) -> dict:
+    from .batch import BatchWorker,scan_videos,adapt_options
+    from .models import Rect
+    from .timing import trimmed_duration
+    verify_media_tools()
+    files=scan_videos(folder);reference=None
+    for path in files:
+        try: reference=probe(path);break
+        except ValueError: continue
+    if reference is None: raise ValueError('Thư mục không có video mẫu hợp lệ')
+    options=EditOptions(speed=2,flip_horizontal=True,crop=Rect(0,0,max(2,reference.width//4*2),max(2,reference.height//4*2)),source_volume=.5)
+    worker=BatchWorker();worker.start(files,directory,options,reference=reference,scale=True)
+    deadline=time.monotonic()+120;terminal=None
+    while worker.running or terminal is None:
+        for event in worker.poll():
+            if event.kind not in ('progress','item'): terminal=event
+        if time.monotonic()>deadline:
+            worker.cancel();worker._thread.join();raise TimeoutError('Batch smoke timed out')
+        time.sleep(.02)
+    if terminal.kind!='completed': raise ValueError(terminal.message or terminal.kind)
+    for row in worker.results:
+        if row.status!='completed': continue
+        source_info=probe(row.source);out=probe(row.output);edit=adapt_options(options,reference,source_info)
+        if (out.width,out.height)!=(edit.crop.width,edit.crop.height) or abs(out.duration-trimmed_duration(edit,source_info.duration))>max(.15,2/source_info.fps):
+            raise ValueError('Batch export size/duration mismatch')
+    counts={status:sum(r.status==status for r in worker.results) for status in ('completed','error','skipped','cancelled')}
+    return {'ok':True,'batch':True,'counts':counts,'report':str(worker.report_path),'outputs':[str(r.output) for r in worker.results if r.status=='completed']}

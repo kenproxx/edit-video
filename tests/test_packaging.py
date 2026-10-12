@@ -287,3 +287,24 @@ def test_cli_inserted_audio_duration_caps_once_track(tmp_path,clips):
     values=samples(Path(data['output']))
     assert tone(values,880,.2,.4)==pytest.approx(.125,abs=.004)
     assert tone(values,880,1.2,1.4)==pytest.approx(0,abs=.003)
+
+
+def test_cli_folder_batch_uses_shared_engine_and_reports_errors(tmp_path,clips):
+    import subprocess,sys,json
+    folder=tmp_path/'input';folder.mkdir();output=tmp_path/'out';output.mkdir();report=tmp_path/'batch.json'
+    (folder/'a.mp4').write_bytes(clips['source'].read_bytes());(folder/'b.mov').write_bytes(clips['silent'].read_bytes());(folder/'bad.mp4').write_bytes(b'broken')
+    result=subprocess.run([sys.executable,str(ROOT/'main.py'),'--batch-smoke-test',str(folder),'--output-dir',str(output),'--report',str(report)],capture_output=True,text=True,timeout=40)
+    assert result.returncode==0,result.stderr
+    data=json.loads(report.read_text(encoding='utf-8'))
+    assert data['ok'] and data['batch'] and data['counts']=={'completed':2,'error':1,'skipped':0,'cancelled':0}
+    from app.media import probe
+    assert probe(output/'a.mp4').duration==pytest.approx(2,abs=.07)
+
+
+def test_batch_cli_report_cannot_shadow_planned_video(tmp_path,clips):
+    import main
+    folder=tmp_path/'input';folder.mkdir();output=tmp_path/'out';output.mkdir()
+    (folder/'a.mp4').write_bytes(clips['source'].read_bytes())
+    target=output/'a.mp4'
+    assert main.main(['--batch-smoke-test',str(folder),'--output-dir',str(output),'--report',str(target)])==1
+    assert not target.exists()
