@@ -10,6 +10,7 @@ from .media import MediaInfo, normalization_filter, frame_destination
 from .models import EditOptions, validate_options
 from .overlays import write_text, write_logo
 from .resources import binary_path
+from .timing import source_interval, trimmed_duration
 
 @dataclass(frozen=True)
 class PreparedRender:
@@ -45,6 +46,9 @@ def _pipeline(source: Path, info: MediaInfo, options: EditOptions, workspace: Pa
         filters.append(f'crop={r.width}:{r.height}:{r.x}:{r.y}:exact=1')
     else:
         filters.append(f'crop={info.width // 2 * 2}:{info.height // 2 * 2}:0:0:exact=1')
+    if options.trim_start or options.trim_end is not None:
+        start,end = source_interval(options,info.duration)
+        filters += ['setpts=PTS-STARTPTS',f'trim=start={start:.9g}:end={end:.9g}']
     filters.append(f'setpts=(PTS-STARTPTS)/{options.speed:g}')
     filters.append(f'fps={info.fps:.9g}:start_time=0:round=near')
     graph = [f'[0:v:0]{",".join(filters)}[v0]']
@@ -73,13 +77,19 @@ def _pipeline(source: Path, info: MediaInfo, options: EditOptions, workspace: Pa
 
 def prepare_render(source: Path, info: MediaInfo, options: EditOptions, destination: Path, workspace: Path) -> PreparedRender:
     args, graph = _pipeline(source, info, options, workspace)
-    duration = info.duration / options.speed
-    if info.has_audio:
-        trim = f'atrim=start={-info.audio_offset:.9g},' if info.audio_offset < 0 else ''
-        offset = max(0, info.audio_offset) / options.speed
+    start,end = source_interval(options,info.duration)
+    duration = trimmed_duration(options,info.duration)
+    has_audio = info.has_audio and end > info.audio_offset
+    if has_audio:
+        if options.trim_start or options.trim_end is not None:
+            astart,aend = max(0,start-info.audio_offset),max(0,end-info.audio_offset)
+            trim = f'atrim=start={astart:.9g}:end={aend:.9g},'
+        else:
+            trim = f'atrim=start={-info.audio_offset:.9g},' if info.audio_offset < 0 else ''
+        offset = max(0, info.audio_offset-start) / options.speed
         graph += f';[0:a:0]{trim}asetpts=PTS-STARTPTS,{_audio_speed(options.speed)},asetpts=PTS+{offset:.9g}/TB[aout]'
     args += ['-filter_complex_threads', '2', '-filter_complex', graph, '-map', '[vout]']
-    if info.has_audio:
+    if has_audio:
         args += ['-map', '[aout]', '-c:a', 'aac', '-b:a', '192k']
     else:
         args += ['-an']
@@ -88,7 +98,7 @@ def prepare_render(source: Path, info: MediaInfo, options: EditOptions, destinat
 
 
 def render_preview(source: Path, info: MediaInfo, options: EditOptions, time: float, destination: Path, cancel: threading.Event | None = None) -> Path:
-    if not math.isfinite(time) or not 0 <= time < info.duration / options.speed:
+    if not math.isfinite(time) or not 0 <= time < trimmed_duration(options,info.duration):
         raise ValueError('Thời điểm preview nằm ngoài video')
     with tempfile.TemporaryDirectory(prefix='video-preview-') as directory, frame_destination(source, destination) as temp:
         args, graph = _pipeline(source, info, options, Path(directory))

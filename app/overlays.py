@@ -22,7 +22,7 @@ def write_text(overlay: TextOverlay, destination):
 def write_logo(overlay, destination):
     with Image.open(overlay.path) as source:
         image = source.convert('RGBA')
-        size = (overlay.width, max(1, round(image.height * overlay.width / image.width)))
+        size = (overlay.width, overlay.height if overlay.height is not None else max(1, round(image.height * overlay.width / image.width)))
         image = image.resize(size, Image.Resampling.LANCZOS)
         image.putalpha(image.getchannel('A').point(lambda value: round(value * overlay.opacity)))
         image.save(destination)

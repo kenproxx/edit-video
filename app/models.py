@@ -30,6 +30,7 @@ class LogoOverlay:
     y: int
     width: int
     opacity: float
+    height: int | None = None
 
 @dataclass(frozen=True)
 class EditOptions:
@@ -43,6 +44,8 @@ class EditOptions:
     watermark: TextOverlay | None = None
     intro: TextOverlay | None = None
     intro_duration: float = 1
+    trim_start: float = 0
+    trim_end: float | None = None
 
 
 def _integer(value: int, name: str, minimum: int = 0) -> None:
@@ -71,6 +74,8 @@ def validate_options(options: EditOptions, width: int, height: int, duration: fl
         raise ValueError('Thời lượng video không hợp lệ')
     if not math.isfinite(options.speed) or not .25 <= options.speed <= 4:
         raise ValueError('Tốc độ phải từ 0.25 đến 4')
+    from .timing import trimmed_duration
+    output_duration = trimmed_duration(options,duration)
     if options.crop:
         _region(options.crop, width, height, even=True)
         width, height = options.crop.width, options.crop.height
@@ -101,11 +106,12 @@ def validate_options(options: EditOptions, width: int, height: int, duration: fl
         if overlay.x + ow > width or overlay.y + oh > height:
             raise ValueError('Text vượt vùng video; giảm font hoặc đổi vị trí')
     if options.intro and options.intro.text.strip():
-        if not math.isfinite(options.intro_duration) or not 0 < options.intro_duration <= duration / options.speed:
+        if not math.isfinite(options.intro_duration) or not 0 < options.intro_duration <= output_duration:
             raise ValueError('Thời gian text đầu vượt thời lượng video đầu ra')
     if options.logo:
         logo = options.logo
         _integer(logo.width, 'logo width', 1)
+        if logo.height is not None: _integer(logo.height,'logo height',1)
         _integer(logo.x, 'logo x')
         _integer(logo.y, 'logo y')
         _opacity(logo.opacity)
@@ -114,7 +120,7 @@ def validate_options(options: EditOptions, width: int, height: int, duration: fl
                 if image.format not in ('PNG', 'JPEG'):
                     raise ValueError('Logo phải là PNG/JPEG')
                 image.load()
-                lh = max(1, round(image.height * logo.width / image.width))
+                lh = logo.height if logo.height is not None else max(1, round(image.height * logo.width / image.width))
         except OSError as exc:
             raise ValueError('Không đọc được logo') from exc
         if logo.x + logo.width > width or logo.y + lh > height:
