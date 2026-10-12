@@ -6,7 +6,7 @@ import subprocess
 import tempfile
 import threading
 import uuid
-from .media import MediaInfo
+from .media import MediaInfo, probe
 from .models import EditOptions
 from .output import OutputReservation, publish_output
 from .render import prepare_render
@@ -127,8 +127,13 @@ class RenderWorker:
                     elif process.returncode != 0:
                         terminal = WorkerEvent('error', message='FFmpeg xuất thất bại; xem log: ' + str(log) + '\n' + ''.join(diagnostic)[-2000:])
                     else:
-                        output = publish_output(temp, reservation)
-                        terminal = WorkerEvent('completed', 1, output=output)
+                        # FFmpeg may exit zero for a trim containing no video frame.
+                        # Validate before touching a confirmed existing destination.
+                        probe(temp, self._cancel)
+                        if self._cancel.is_set(): terminal = WorkerEvent('cancelled')
+                        else:
+                            output = publish_output(temp, reservation)
+                            terminal = WorkerEvent('completed', 1, output=output)
         except Exception as exc:
             terminal = WorkerEvent('cancelled' if self._cancel.is_set() else 'error', message=str(exc))
         finally:

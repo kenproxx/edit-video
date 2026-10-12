@@ -86,3 +86,8 @@ def test_trim_early_audio_selects_correct_content(tmp_path):
     samples=array('f');samples.frombytes(raw);middle=samples[10000:34000]
     crossings=sum(a<=0<b for a,b in zip(middle,middle[1:]))
     assert crossings/.5==pytest.approx(880,rel=.03)
+
+@pytest.mark.parametrize('duration',[4.066667,59.999999,60.000001])
+def test_formatted_endpoint_never_exceeds_source(duration):
+    from app.timing import format_time,parse_time
+    assert 0<=duration-parse_time(format_time(duration))<.0011

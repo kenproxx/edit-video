@@ -13,6 +13,7 @@ class PreviewCanvas(ctk.CTkFrame):
         self.canvas = tk.Canvas(self,bg='#151a23',highlightthickness=0,width=320,height=240)
         self.canvas.grid(row=0,column=0,sticky='nsew')
         self.selected = selected
+        self.adjust_region = None
         self.mode = 'preview'
         self.image_size = None
         self.image_box = Rect(0,0,0,0)
@@ -100,7 +101,10 @@ class PreviewCanvas(ctk.CTkFrame):
         if self._operation=='move':
             return move_region(self._original,end[0]-start[0],end[1]-start[1],self.image_size,self.mode=='crop')
         if self._operation not in ('draw','place'):
-            return resize_region(self._original,self._operation,end[0]-start[0],end[1]-start[1],self.image_size,self.mode=='crop')
+            region=resize_region(self._original,self._operation,end[0]-start[0],end[1]-start[1],self.image_size,self.mode=='crop')
+            if self.adjust_region is not None:
+                region=self.adjust_region(self.mode,region,self.image_size,self._operation,self._original)
+            return region
         if self._operation=='place':
             r=self._original
             return Rect(min(end[0],self.image_size[0]-r.width),min(end[1],self.image_size[1]-r.height),r.width,r.height)

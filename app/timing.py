@@ -19,9 +19,11 @@ def parse_time(value: str) -> float:
 
 
 def format_time(seconds: float) -> str:
-    minutes=int(seconds//60)
-    rest=seconds-minutes*60
-    return f'{minutes:02d}:{rest:06.3f}'.rstrip('0').rstrip('.')
+    from decimal import Decimal
+    if not math.isfinite(seconds) or seconds < 0: raise ValueError("Thời gian không hợp lệ")
+    minutes, rest = divmod(int(Decimal(str(seconds))*1000),60000)
+    whole, fraction = divmod(rest,1000)
+    return f'{minutes:02d}:{whole:02d}.{fraction:03d}'.rstrip('0').rstrip('.')
 
 
 def source_interval(options,duration):

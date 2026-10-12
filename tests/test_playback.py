@@ -120,3 +120,26 @@ def test_proxy_audio_materializes_leading_silence(tmp_path):
     samples=array('f');samples.frombytes(raw)
     assert max(abs(v) for v in samples[:24000])<.001
     assert max(abs(v) for v in samples[60000:72000])>.05
+
+
+def test_display_frames_follow_monotonic_clock_and_finish_full_duration(clips):
+    player=controller()
+    try:
+        player.prepare(clips['silent'],probe(clips['silent']),EditOptions())
+        wait(player,lambda e:e.kind=='ready')
+        player.play(0);origin=None;frames=[];completed=None
+        deadline=time.monotonic()+8
+        while time.monotonic()<deadline and completed is None:
+            for event in player.poll():
+                now=time.monotonic()
+                if event.kind=='frame':
+                    if origin is None: origin=now
+                    frames.append((event.time,now-origin));event.image.close()
+                elif event.kind=='completed': completed=now
+                elif event.kind=='error': pytest.fail(event.message)
+            time.sleep(.01)
+        assert frames[0][0]==0
+        assert len(frames)>30
+        assert all(abs(stamp-elapsed)<.16 for stamp,elapsed in frames)
+        assert completed is not None and player.duration-.12<=completed-origin<=player.duration+.35
+    finally: close(player)

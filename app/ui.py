@@ -91,6 +91,7 @@ class VideoEditorApp(ctk.CTk):
         self.help_label = ctk.CTkLabel(left,text='Kéo bên trong vùng để di chuyển; kéo góc/cạnh để resize.\nLogo/text/blur dùng ảnh sau crop; crop dùng ảnh sau lật.\nPreview sẽ chuẩn bị lại sau khi đổi hiệu ứng.',justify='left',anchor='w')
         self.help_label.grid(row=6,column=0,sticky='ew',padx=10,pady=8)
         self.options = OptionsPanel(body,self.options_changed)
+        self.preview_canvas.adjust_region=self.options.adjust_canvas_region
         self.options.grid(row=0,column=1,sticky='ns')
         bottom = ctk.CTkFrame(self)
         bottom.grid(row=2,column=0,sticky='ew',padx=12,pady=(6,12));bottom.columnconfigure(0,weight=1)

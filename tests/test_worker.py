@@ -86,3 +86,13 @@ def test_cleanup_error_always_finishes_worker(clips,tmp_path,monkeypatch):
     assert not worker.running
     events=worker.poll()
     assert events[-1].kind=='error' and 'locked' in events[-1].message
+
+
+def test_empty_trim_preserves_existing_destination(clips,tmp_path):
+    source=clips['silent'];target=tmp_path/'existing.mp4';target.write_bytes(b'old destination')
+    worker=RenderWorker()
+    worker.start(source,probe(source),EditOptions(trim_start=1.01,trim_end=1.02),reserve_output(source,target,True))
+    events=wait_done(worker)
+    assert events[-1].kind=='error'
+    assert target.read_bytes()==b'old destination'
+    assert not list(tmp_path.glob('.videoeditor-render-*'))

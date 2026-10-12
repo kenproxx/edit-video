@@ -422,3 +422,24 @@ def test_watermark_moves_and_resizes_from_canvas(editor,clips,font):
     canvas.press(canvas_point(canvas,region.x+region.width,region.y+region.height))
     canvas.release(canvas_point(canvas,region.x+region.width*2,region.y+region.height*2))
     assert editor.options.read_options().watermark.size>16
+
+
+@pytest.mark.parametrize('position,handle', [((40,215),'e'),((280,40),'s')])
+def test_text_resize_at_edge_keeps_live_and_export_bounds(editor,clips,font,position,handle):
+    from app.models import validate_options
+    from app.overlays import text_bounds
+    from PIL import ImageFont
+    load(editor,clips['source'])
+    panel=editor.options.text_panels['watermark']
+    panel.vars['font'].set(str(font));panel.vars['text'].set('WM');panel.vars['size'].set('16')
+    editor.options.apply_region('watermark',position)
+    editor.mode_var.set('watermark');editor.selection_mode_changed()
+    spin(editor,lambda:editor._display_mode=='watermark')
+    canvas=editor.preview_canvas;region=canvas._selection
+    x,y=canvas._handles(region)[handle]
+    canvas.press(canvas_point(canvas,x,y))
+    target=canvas_point(canvas,x+(region.width if handle=='e' else 0),y+(region.height if handle=='s' else 0))
+    canvas.drag(target);live=canvas._selection;canvas.release(target)
+    options=editor.options.read_options();validate_options(options,320,240,4)
+    text=options.watermark;w,h=text_bounds(text,ImageFont.truetype(str(text.font),text.size))[1]
+    assert live==Rect(text.x,text.y,w,h)

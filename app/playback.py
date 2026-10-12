@@ -5,6 +5,7 @@ import shutil
 import subprocess
 import tempfile
 import threading
+import time
 from PIL import Image
 from .models import validate_options
 from .output import reserve_output
@@ -26,9 +27,10 @@ class PlaybackEvent:
 
 class FrameReader:
     """One latest frame, two native processes, one decoder thread."""
-    def __init__(self,path,size,fps,start,generation,audio):
+    def __init__(self,path,size,fps,start,generation,audio,duration):
         self.path,self.size,self.fps,self.start=path,size,min(15,fps),start
         self.generation,self.audio=generation,audio
+        self.duration=duration
         self.process=self.audio_process=None
         self._cancel=threading.Event();self._finished=threading.Event()
         self._lock=threading.Lock();self._frame=self._terminal=None
@@ -70,16 +72,20 @@ class FrameReader:
     def _run(self):
         error=''
         try:
-            args=[binary_path('ffmpeg'),'-hide_banner','-loglevel','error','-nostdin','-threads','2','-ss',f'{self.start:.9g}','-re','-i',self.path,'-an','-vf',f'fps={self.fps:.9g}','-pix_fmt','rgb24','-threads','2','-f','rawvideo','pipe:1']
+            args=[binary_path('ffmpeg'),'-hide_banner','-loglevel','error','-nostdin','-threads','2','-ss',f'{self.start:.9g}','-i',self.path,'-an','-vf',f'fps={self.fps:.9g}','-pix_fmt','rgb24','-threads','2','-f','rawvideo','pipe:1']
             self.process=subprocess.Popen([str(a) for a in args],stdout=subprocess.PIPE,stderr=subprocess.DEVNULL,**quiet_process_options())
             if self.audio and not self._cancel.is_set():
                 args=[binary_path('ffplay'),'-hide_banner','-loglevel','error','-nodisp','-vn','-autoexit','-ss',f'{self.start:.9g}',self.path]
                 self.audio_process=subprocess.Popen([str(a) for a in args],stdin=subprocess.DEVNULL,stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL,**quiet_process_options())
             if self._cancel.is_set(): self.stop()
+            origin=None
             count=0;length=self.size[0]*self.size[1]*3
             while not self._cancel.is_set():
                 data=self.process.stdout.read(length)
                 if len(data)!=length: break
+                if origin is None: origin=time.monotonic()
+                delay=origin+count/self.fps-time.monotonic()
+                if self._cancel.wait(max(0,delay)): break
                 image=Image.frombytes('RGB',self.size,data)
                 with self._lock:
                     if self._cancel.is_set(): image.close();break
@@ -87,6 +93,8 @@ class FrameReader:
                     self._frame=PlaybackEvent('frame',self.generation,image,self.start+count/self.fps)
                 count+=1
             if not self._cancel.is_set() and self.process.wait(timeout=3)!=0: error='Không giải mã được preview video'
+            if not error and origin is not None:
+                self._cancel.wait(max(0,origin+self.duration-self.start-time.monotonic()))
         except Exception as exc:
             if not self._cancel.is_set(): error=str(exc)
         finally:
@@ -150,7 +158,7 @@ class PlaybackController:
         path,info,options=self._proxy
         _,end=source_interval(options,info.duration)
         audio=info.has_audio and end>info.audio_offset
-        self._reader=FrameReader(path,preview_size(info,options),info.fps,time,self._generation,audio)
+        self._reader=FrameReader(path,preview_size(info,options),info.fps,time,self._generation,audio,self.duration)
 
     def poll(self):
         events=[]

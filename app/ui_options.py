@@ -192,6 +192,37 @@ class OptionsPanel(ctk.CTkScrollableFrame):
         if self.info is None: return
         self.apply_region('crop',preset_crop(self.info.width,self.info.height,tuple(map(int,ratio.split(':')))))
 
+    def fit_text_region(self,kind,region,bounds,handle='',original=None,fit_only=False):
+        """Use the actual font raster, preserving the opposite resize edge."""
+        from dataclasses import replace
+        from PIL import ImageFont
+        from .overlays import text_bounds
+        overlay=self.text_panels[kind].read()
+        if overlay is None: return region,1
+        def size_at(size):
+            return text_bounds(replace(overlay,size=size),ImageFont.truetype(str(overlay.font),size))[1]
+        w,h=size_at(overlay.size)
+        ratio=region.width/w if abs(region.width-w)>=abs(region.height-h) else region.height/h
+        desired=max(1,round(overlay.size*ratio))
+        anchor=original or region
+        def geometry(size):
+            width,height=size_at(size)
+            x=anchor.x+anchor.width-width if 'w' in handle else region.x
+            y=anchor.y+anchor.height-height if 'n' in handle else region.y
+            return Rect(x,y,width,height)
+        low,high,best=1,(max(bounds)*2 if fit_only else desired),1
+        while low<=high:
+            middle=(low+high)//2;r=geometry(middle)
+            fits=0<=r.x and 0<=r.y and r.x+r.width<=bounds[0] and r.y+r.height<=bounds[1]
+            if fit_only: fits=fits and r.width<=region.width and r.height<=region.height
+            if fits: best=middle;low=middle+1
+            else: high=middle-1
+        return geometry(best),best
+
+    def adjust_canvas_region(self,kind,region,bounds,handle,original):
+        if kind not in self.text_panels or not isinstance(region,Rect): return region
+        return self.fit_text_region(kind,region,bounds,handle,original)[0]
+
     def apply_region(self,kind,region):
         with self.batch():
             if kind in ('crop','blur'):
@@ -206,13 +237,11 @@ class OptionsPanel(ctk.CTkScrollableFrame):
             else:
                 panel = self.text_panels[kind]
                 if isinstance(region,Rect):
-                    from .overlays import text_bounds
-                    from PIL import ImageFont
-                    overlay=panel.read()
-                    if overlay:
-                        w,h=text_bounds(overlay,ImageFont.truetype(str(overlay.font),overlay.size))[1]
-                        ratio=region.width/w if abs(region.width-w)>=abs(region.height-h) else region.height/h
-                        panel.vars['size'].set(str(max(1,round(overlay.size*ratio))))
+                    bounds=(self.info.width,self.info.height)
+                    crop=self.read_options().crop
+                    if crop is not None: bounds=(crop.width,crop.height)
+                    region,size=self.fit_text_region(kind,region,bounds,fit_only=True)
+                    panel.vars['size'].set(str(size))
                     panel.vars['x'].set(str(region.x));panel.vars['y'].set(str(region.y))
                 else:
                     panel.vars['x'].set(str(region[0]));panel.vars['y'].set(str(region[1]))

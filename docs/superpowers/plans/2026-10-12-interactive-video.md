@@ -23,20 +23,20 @@
 ### Task 1: Source trim and geometry model
 Files app/models.py app/render.py app/overlays.py app/timing.py tests/test_trim.py tests/test_models.py.
 Interfaces EditOptions adds trim_start=0,trim_end=None; trimmed_duration(options,duration) validates interval; LogoOverlay height=None; parse_time(value) accepts mm:ss/hh:mm:ss or decimal minutes.
-- [ ] Write validation/format tests and real FFmpeg source interval, speed, preview/intro and early/delayed audio tests; run RED.
-- [ ] Implement interval filters with video/audio origin preserved, independent logo height backwards compatible; run GREEN.
-- [ ] Commit task model/engine.
+- [x] Write validation/format tests and real FFmpeg source interval, speed, preview/intro and early/delayed audio tests; run RED.
+- [x] Implement interval filters with video/audio origin preserved, independent logo height backwards compatible; run GREEN.
+- [x] Commit task model/engine.
 
 ### Task 2: Canvas handles and trim controls
 Files app/geometry.py app/ui_canvas.py app/ui_options.py app/ui.py tests/test_ui.py tests/test_geometry.py.
 Interfaces resize_region(original,handle,dx,dy,bounds,even=False)->Rect; move_region(original,dx,dy,bounds,even=False)->Rect. Canvas selected callback supports Rect for overlay and legacy point; set_overlay(image,Rect) gives live dragged item. UI updates options once per release, crop/flip dependencies remain explicit.
-- [ ] Write drag/move/each-handle, bounds/letterbox, actual overlay placement and trim field GUI tests; run RED.
-- [ ] Implement visible eight handles, live overlay feedback and optional numeric fields; add trim UI/timeline clipped duration; run GREEN.
-- [ ] Commit direct manipulation UI.
+- [x] Write drag/move/each-handle, bounds/letterbox, actual overlay placement and trim field GUI tests; run RED.
+- [x] Implement visible eight handles, live overlay feedback and optional numeric fields; add trim UI/timeline clipped duration; run GREEN.
+- [x] Commit direct manipulation UI.
 
 ### Task 3: Embedded proxy playback and bundle
 Files app/playback.py app/render.py app/worker.py app/resources.py app/ui.py scripts/bootstrap-build.ps1 VideoEditor.spec scripts/smoke-packaged.py tests/test_playback.py tests/test_ui.py.
 Interfaces prepare_render(...,preview=False), preview_size(info,options); worker.start(...,preview=False). PlaybackController prepare,play(time),pause,invalidate,poll,close; busy/playing/ready; events progress/ready/frame/error/completed carrying generation.
-- [ ] Write actual render/decode playback, stale/edit/seek/close, bounded frame/audio lifecycle and GUI play/pause tests; run RED.
-- [ ] Implement edited proxy, bounded decoder/audio subprocesses, main-thread playback controls; bundle ffplay; run GREEN.
-- [ ] Full suite, fresh Native reviewer, one fix pass with RED/GREEN, update docs and commit. Confirm Windows build/acceptance through CI before claiming EXE validated.
+- [x] Write actual render/decode playback, stale/edit/seek/close, bounded frame/audio lifecycle and GUI play/pause tests; run RED.
+- [x] Implement edited proxy, bounded decoder/audio subprocesses, main-thread playback controls; bundle ffplay; run GREEN.
+- [x] Full suite, fresh Native reviewer, one fix pass with RED/GREEN, update docs and commit. Confirm Windows build/acceptance through CI before claiming EXE validated.

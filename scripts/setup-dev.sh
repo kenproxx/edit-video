@@ -5,7 +5,7 @@ PYTHON_BIN="${VIDEO_EDITOR_PYTHON:-python3}"
 "$PYTHON_BIN" -c 'import sys; assert sys.version_info[:2] == (3, 12), "Use Python 3.12"'
 "$PYTHON_BIN" -m venv .venv
 .venv/bin/python -m pip install --requirement requirements-dev.txt
-if ! command -v ffmpeg >/dev/null || ! command -v ffprobe >/dev/null; then
+if ! command -v ffmpeg >/dev/null || ! command -v ffprobe >/dev/null || ! command -v ffplay >/dev/null; then
   if command -v apt-get >/dev/null; then
     if [[ $(id -u) == 0 ]]; then
       apt-get update
@@ -21,3 +21,4 @@ if ! command -v ffmpeg >/dev/null || ! command -v ffprobe >/dev/null; then
 fi
 ffmpeg -version
 ffprobe -version
+ffplay -version
