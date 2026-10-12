@@ -22,7 +22,9 @@ Reviewer độc lập read-only theo Native workflow tìm bốn Important, khôn
 3. Resize text sát mép làm raster vượt khung: dùng kích thước font thật cho live drag và release, giữ cạnh đối diện.
 4. Input -re chạy display sớm: thay bằng lịch frame theo monotonic clock; completed sau đủ thời lượng, không cắt audio ở decoder EOF sớm.
 
-Regression targeted: trước sửa 6 failed/1 passed, sau sửa 7 passed. Full suite: **169 passed in 77.92s**, không skip/warning. `git diff --check` sạch. Native Windows acceptance chờ CI cho revision này.
+Regression targeted: trước sửa 6 failed/1 passed, sau sửa 7 passed. Full suite: **169 passed in 77.92s**, không skip/warning. `git diff --check` sạch. Native Windows acceptance **thành công**: run [38262691731](https://github.com/kenproxx/edit-video/actions/runs/38262691731) tại code commit `d7f82298eca6a2ef401ca7861a51e2a846d4fba7`. Bootstrap không có Python/FFmpeg trên PATH, kiểm tra cache/tamper, build lại, chính EXE xuất video với Unicode/read-only app directory/restricted PATH, GUI startup/close và embedded playback/seek/audio/cleanup đều qua.
+
+Artifact [VideoEditor-windows-x64](https://github.com/kenproxx/edit-video/actions/runs/38262691731/artifacts/11753322445): 130,392,946 bytes, SHA256 `a42bab44c55876881ff97e80aad204a87b05c1de6265a785076e0f1607a97541`. GitHub metadata xác nhận artifact chưa expired; artifact có EXE và giấy phép/checksum. Không tạo hay publish release mới trong phase này.
 
 ## Rulings
 
