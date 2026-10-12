@@ -28,7 +28,7 @@ Kết quả dự kiến: `dist/VideoEditor.exe`, SHA-256 và thư mục giấy p
 
 Cache ở `.build-cache/` và được kiểm tra trước khi dùng archive; venv được tạo lại mỗi lần. Nếu cache sai hash, script báo file lỗi và dừng; xóa đúng file đó để tải lại. Build dùng PowerShell x64 có sẵn trên Windows; `build.sh` cần Git Bash.
 
-Workflow [Windows standalone editor](.github/workflows/windows-build.yml) chuẩn bị build khi PATH không cung cấp Python/FFmpeg, build lại, kiểm tra cache bị sửa, rồi chạy chính EXE với PATH giới hạn, đường dẫn tiếng Việt, thư mục app chỉ đọc và GUI startup/close. Artifact chỉ được upload nếu những bước đó qua; Run [38262691731](https://github.com/kenproxx/edit-video/actions/runs/38262691731) đã chạy thành công trên Windows với playback/seek/audio ngay trong app. Tải build mới ở artifact **VideoEditor-windows-x64** của run này. Workflow build không tự publish release.
+Workflow [Windows standalone editor](.github/workflows/windows-build.yml) chuẩn bị build khi PATH không cung cấp Python/FFmpeg, build lại, kiểm tra cache bị sửa, rồi chạy chính EXE với PATH giới hạn, đường dẫn tiếng Việt, thư mục app chỉ đọc và GUI startup/close. Artifact chỉ được upload nếu những bước đó qua; Run [38268802592](https://github.com/kenproxx/edit-video/actions/runs/38268802592) đã chạy thành công trên Windows với playback/seek/audio ngay trong app, âm lượng riêng và giới hạn nhạc chèn. Tải build mới ở artifact **VideoEditor-windows-x64** của run này. Workflow build không tự publish release.
 
 Trước khi phân phối bản chứa FFmpeg GPL, bổ sung complete corresponding source của static build; xem [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md). Giấy phép đi kèm hiện không thay thế source bundle còn thiếu.
 
