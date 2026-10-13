@@ -1,6 +1,6 @@
 # Video Editor
 
-App desktop Python để chỉnh một video và xuất MP4 mới. **Đã có GUI, engine và Windows EXE được build/kiểm chứng trên GitHub Actions. Release `v0.1.0` giữ trạng thái nháp trong khi chờ corresponding source của FFmpeg trước khi phân phối công khai.**
+App desktop Python để chỉnh một video và xuất MP4 mới. **Đã có GUI, engine và Windows EXE được build/kiểm chứng trên GitHub Actions. Các release version giữ trạng thái nháp trong khi chờ corresponding source của FFmpeg trước khi phân phối công khai.**
 
 ## Chức năng
 
@@ -104,3 +104,5 @@ git push origin v0.3.0
 Hoặc vào **Actions → Build EXE and attach version release → Run workflow**, chọn `main`, nhập tag version mới. Workflow kiểm tra version, dùng lại toàn bộ build/acceptance Windows, xác thực artifact/EXE SHA256 và commit rồi tạo release nháp và gắn `VideoEditor.exe`, ZIP theo version, `SHA256SUMS.txt`, notices. Không cần PAT riêng; dùng `GITHUB_TOKEN` của repo với quyền write chỉ ở job release.
 
 Tag/release đã có phải cùng commit và còn ở draft; asset đã có chỉ được giữ nếu cùng checksum, không tự thay binary khác. Nếu lỗi upload, rerun job release. Release giữ trạng thái draft theo điều kiện corresponding-source FFmpeg trong `THIRD_PARTY_NOTICES.md`; workflow không tự publish công khai. Workflow build thường trên main/PR vẫn chỉ upload artifact.
+
+Đã kiểm chứng thực tế: tag `v0.2.1`, [run 38346054931](https://github.com/kenproxx/edit-video/actions/runs/38346054931) thành công cả build và attach; rerun riêng release job giữ nguyên các asset/checksum. Bản nháp xem trong [GitHub Releases](https://github.com/kenproxx/edit-video/releases).

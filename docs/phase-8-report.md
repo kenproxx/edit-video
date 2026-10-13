@@ -94,3 +94,9 @@ jobs:
 Tag v0.2.0 kích hoạt run38345256459; Windows build/EXE acceptance qua, tạo draft thành công nhưng bước attach đọc release.json rỗng khi list ngay sau creation. Thay bằng helper ensure-version-release.py lưu trực tiếp response POST (hoặc metadata draft hiện có), giữ kiểm tra tag/commit/draft. Bốn boundary regressions RED→GREEN, tests dùng response shape của GitHub tại ranh giới API. Full suite sau sửa: **234 passed in105.05s**, không skip/warning/timeout hay stack dump.
 
 Rerun failed release job của v0.2.0 thành công ở attempt2, dùng lại build/artifact đã qua và giữ target/tag cũ; xác nhận recovery qua filter all. Version v0.2.1 sẽ kiểm chứng luồng tạo draft lần đầu với helper sửa, không force-move tag v0.2.0.
+
+## Kết quả cuối
+
+Tag-triggered run [38346054931](https://github.com/kenproxx/edit-video/actions/runs/38346054931) tại code72b41f7 **SUCCESS**: validate, reusable native Windows build/acceptance và create/attach draft đều qua lần đầu cho v0.2.1. Rerun riêng job release cũng SUCCESS (attempt2); API xác nhận giữ nguyên ID, size, digest và state uploaded của cả bốn asset. Draft v0.2.1 ID411270387 target72b41f7 đúng tag/build; v0.2.0 ID411262596 đã phục hồi đầy đủ assets, không di chuyển tag cũ.
+
+Assets: VideoEditor.exe, VideoEditor-windows-x64-v0.2.1.zip, SHA256SUMS.txt, THIRD_PARTY_NOTICES.md. Không publish công khai. Hướng dẫn tag/Actions manual đã ghi README; main chứa workflow và helper sửa, tag v0.2.1 giữ nguyên code đã kiểm chứng.
