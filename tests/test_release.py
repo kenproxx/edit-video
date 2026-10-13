@@ -68,3 +68,34 @@ def test_release_does_not_overwrite_existing_output(release_inputs,tmp_path):
     output=tmp_path/'assets';output.mkdir();file=output/'keep';file.write_text('keep')
     with pytest.raises(FileExistsError): preparer()(*release_inputs,output)
     assert file.read_text()=='keep'
+
+
+def test_version_workflow_can_attach_after_verified_build_job(release_inputs,tmp_path):
+    archive,artifact,release,run=release_inputs
+    run.update(id=42,path='.github/workflows/version-release.yml',head_branch=release['tag_name'],event='push',status='in_progress',conclusion=None)
+    artifact['workflow_run']={'id':42,'head_sha':run['head_sha']}
+    jobs={'jobs':[{'run_id':42,'name':'build / build-and-smoke','status':'completed','conclusion':'success'}]}
+    files=preparer()(archive,artifact,release,run,tmp_path/'assets',build_jobs=jobs)
+    assert len(files)==4
+
+
+@pytest.mark.parametrize('case',['failed_job','pending_job','wrong_run','wrong_artifact','wrong_event'])
+def test_version_workflow_requires_matching_successful_job(release_inputs,tmp_path,case):
+    archive,artifact,release,run=release_inputs
+    run.update(id=42,path='.github/workflows/version-release.yml',head_branch='main',event='workflow_dispatch',status='in_progress',conclusion=None)
+    artifact['workflow_run']={'id':42,'head_sha':run['head_sha']}
+    job={'run_id':42,'name':'build / build-and-smoke','status':'completed','conclusion':'success'}
+    if case=='failed_job': job['conclusion']='failure'
+    if case=='pending_job': job['status']='in_progress'
+    if case=='wrong_run': job['run_id']=7
+    if case=='wrong_artifact': artifact['workflow_run']['id']=7
+    if case=='wrong_event': run['event']='pull_request'
+    with pytest.raises(ValueError): preparer()(archive,artifact,release,run,tmp_path/'assets',build_jobs={'jobs':[job]})
+
+
+def test_version_retry_selects_latest_build_attempt(release_inputs,tmp_path):
+    archive,artifact,release,run=release_inputs
+    run.update(id=42,path='.github/workflows/version-release.yml',head_branch='main',event='workflow_dispatch',status='in_progress',conclusion=None)
+    artifact['workflow_run']={'id':42,'head_sha':run['head_sha']}
+    jobs={'jobs':[{'id':1,'run_id':42,'name':'build / build-and-smoke','status':'completed','conclusion':'failure'}, {'id':2,'run_id':42,'name':'build / build-and-smoke','status':'completed','conclusion':'success'}]}
+    assert len(preparer()(archive,artifact,release,run,tmp_path/'assets',build_jobs=jobs))==4

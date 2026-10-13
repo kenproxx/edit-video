@@ -13,12 +13,24 @@ def digest(path):
     with path.open('rb') as stream: return hashlib.file_digest(stream,'sha256').hexdigest()
 
 
-def prepare_release(archive,artifact,release,run,output):
+def prepare_release(archive,artifact,release,run,output,build_jobs=None):
     if not release.get('draft'): raise ValueError('Only a draft release may receive these assets')
     tag=release['tag_name']
     if not re.fullmatch(r'v\d+\.\d+\.\d+(?:-[A-Za-z0-9.-]+)?',tag): raise ValueError('Invalid release version')
-    if run.get('status')!='completed' or run.get('conclusion')!='success' or run.get('head_branch')!='main' or run.get('path')!='.github/workflows/windows-build.yml':
-        raise ValueError('Release requires a successful Windows build from main')
+    if build_jobs is None:
+        if run.get('status')!='completed' or run.get('conclusion')!='success' or run.get('head_branch')!='main' or run.get('path')!='.github/workflows/windows-build.yml':
+            raise ValueError('Release requires a successful Windows build from main')
+    else:
+        valid_run=(run.get('status')=='in_progress' or (run.get('status')=='completed' and run.get('conclusion')=='success'))
+        valid_source=(run.get('event')=='push' and run.get('head_branch')==tag) or (run.get('event')=='workflow_dispatch' and run.get('head_branch')=='main')
+        jobs=[j for j in build_jobs.get('jobs',[]) if j.get('name') in ('build / build-and-smoke','build-and-smoke')]
+        if run.get('path')!='.github/workflows/version-release.yml' or not valid_run or not valid_source or not jobs:
+            raise ValueError('Invalid version release workflow provenance')
+        job=max(jobs,key=lambda item:item.get('id',0))
+        if job.get('run_id')!=run.get('id') or job.get('status')!='completed' or job.get('conclusion')!='success':
+            raise ValueError('Version release requires its successful Windows build job')
+        if artifact.get('workflow_run',{}).get('id')!=run.get('id') or artifact.get('workflow_run',{}).get('head_sha')!=run.get('head_sha'):
+            raise ValueError('Artifact belongs to another workflow run')
     if run.get('head_sha')!=release.get('target_commitish'): raise ValueError('Release commit does not match tested build')
     if artifact.get('name')!='VideoEditor-windows-x64' or artifact.get('expired'): raise ValueError('Wrong or expired build artifact')
     if artifact.get('digest')!='sha256:'+digest(archive): raise ValueError('GitHub artifact SHA256 mismatch')
@@ -55,8 +67,9 @@ def main():
     parser=argparse.ArgumentParser()
     for name in ('archive','artifact-json','release-json','run-json','output-dir'):
         parser.add_argument('--'+name,type=Path,required=True)
+    parser.add_argument('--build-jobs-json',type=Path)
     args=parser.parse_args()
-    files=prepare_release(args.archive,json.loads(args.artifact_json.read_text()),json.loads(args.release_json.read_text()),json.loads(args.run_json.read_text()),args.output_dir)
+    files=prepare_release(args.archive,json.loads(args.artifact_json.read_text()),json.loads(args.release_json.read_text()),json.loads(args.run_json.read_text()),args.output_dir,build_jobs=json.loads(args.build_jobs_json.read_text()) if args.build_jobs_json else None)
     (args.output_dir/'upload-files.json').write_text(json.dumps([str(p.resolve()) for p in files]),encoding='utf-8')
     print('Verified release assets prepared:',args.output_dir)
 

@@ -91,3 +91,16 @@ Release nháp `v0.1.0` lấy artifact của run Windows đã thành công, kèm 
 Workflow `Attach verified EXE to draft release` nhận tag bản nháp và run ID của workflow Windows. Nó chỉ nhận build thành công từ `main` đúng commit đích release, kiểm tra digest artifact + hash EXE + PE x64 và giữ release ở trạng thái draft. Asset đã có chỉ được giữ lại nếu cùng digest; không ghi đè file khác và không tự Publish.
 
 Trong cloud, API đọc/tạo release hoạt động nhưng upload trực tiếp trả 401; workflow dùng token repository để upload. Trước Publish cần bổ sung complete corresponding source của FFmpeg static; xem `THIRD_PARTY_NOTICES.md`.
+
+## Tự build EXE theo version
+
+Workflow [Build EXE and attach version release](.github/workflows/version-release.yml) chạy khi push tag `vX.Y.Z` (hoặc prerelease như `v0.3.0-beta.1`). Ví dụ version mới:
+
+```bash
+git tag v0.3.0
+git push origin v0.3.0
+```
+
+Hoặc vào **Actions → Build EXE and attach version release → Run workflow**, chọn `main`, nhập tag version mới. Workflow kiểm tra version, dùng lại toàn bộ build/acceptance Windows, xác thực artifact/EXE SHA256 và commit rồi tạo release nháp và gắn `VideoEditor.exe`, ZIP theo version, `SHA256SUMS.txt`, notices. Không cần PAT riêng; dùng `GITHUB_TOKEN` của repo với quyền write chỉ ở job release.
+
+Tag/release đã có phải cùng commit và còn ở draft; asset đã có chỉ được giữ nếu cùng checksum, không tự thay binary khác. Nếu lỗi upload, rerun job release. Release giữ trạng thái draft theo điều kiện corresponding-source FFmpeg trong `THIRD_PARTY_NOTICES.md`; workflow không tự publish công khai. Workflow build thường trên main/PR vẫn chỉ upload artifact.
