@@ -88,3 +88,9 @@ jobs:
                   continue
               subprocess.run(['gh','release','upload',tag,path,'--repo',repo],check=True)
           PY
+
+## Kiểm chứng runtime và sửa metadata
+
+Tag v0.2.0 kích hoạt run38345256459; Windows build/EXE acceptance qua, tạo draft thành công nhưng bước attach đọc release.json rỗng khi list ngay sau creation. Thay bằng helper ensure-version-release.py lưu trực tiếp response POST (hoặc metadata draft hiện có), giữ kiểm tra tag/commit/draft. Bốn boundary regressions RED→GREEN, tests dùng response shape của GitHub tại ranh giới API. Full suite sau sửa: **234 passed in105.05s**, không skip/warning/timeout hay stack dump.
+
+Rerun failed release job của v0.2.0 thành công ở attempt2, dùng lại build/artifact đã qua và giữ target/tag cũ; xác nhận recovery qua filter all. Version v0.2.1 sẽ kiểm chứng luồng tạo draft lần đầu với helper sửa, không force-move tag v0.2.0.
