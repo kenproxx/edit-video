@@ -126,7 +126,7 @@ def smoke_embedded_playback(source: Path, audio_path: Path | None = None) -> dic
     return {'ok':True,'playback':True,'frames':state['frames'],'audio':state['audio'],'duration':state['duration']}
 
 
-def smoke_batch(folder: Path,directory: Path) -> dict:
+def smoke_batch(folder: Path,directory: Path,trim_start: float = 0,trim_end: float | None = None) -> dict:
     from .batch import BatchWorker,scan_videos,adapt_options
     from .models import Rect
     from .timing import trimmed_duration
@@ -136,7 +136,7 @@ def smoke_batch(folder: Path,directory: Path) -> dict:
         try: reference=probe(path);break
         except ValueError: continue
     if reference is None: raise ValueError('Thư mục không có video mẫu hợp lệ')
-    options=EditOptions(speed=2,flip_horizontal=True,crop=Rect(0,0,max(2,reference.width//4*2),max(2,reference.height//4*2)),source_volume=.5)
+    options=EditOptions(speed=2,trim_start=trim_start,trim_end=trim_end,flip_horizontal=True,crop=Rect(0,0,max(2,reference.width//4*2),max(2,reference.height//4*2)),source_volume=.5)
     worker=BatchWorker();worker.start(files,directory,options,reference=reference,scale=True)
     deadline=time.monotonic()+120;terminal=None
     while worker.running or terminal is None:

@@ -29,8 +29,13 @@ def format_time(seconds: float) -> str:
 def source_interval(options,duration):
     start=options.trim_start
     end=duration if options.trim_end is None else options.trim_end
-    if not all(math.isfinite(v) for v in (start,end,duration)) or not 0<=start<end<=duration:
-        raise ValueError('Đoạn cắt cần 0 ≤ từ < tới ≤ thời lượng video nguồn')
+    if not all(math.isfinite(v) for v in (start,end,duration)) or duration<=0 or start<0:
+        raise ValueError('Đoạn cắt cần thời gian hữu hạn, không âm và video hợp lệ')
+    if options.trim_end is not None and end<=start:
+        raise ValueError('Đoạn cắt cần mốc tới lớn hơn mốc từ')
+    # A valid requested interval that does not fit this source leaves it whole.
+    # Keep this decision shared by validation, preview, audio and batch export.
+    if end>duration or start>=duration: return 0,duration
     return start,end
 
 

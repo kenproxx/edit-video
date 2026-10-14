@@ -109,6 +109,14 @@ def main():
         batched=json.loads(batch_report.read_text(encoding='utf-8'))
         assert batched['ok'] and batched['batch'] and batched['counts']=={'completed':2,'error':1,'skipped':1,'cancelled':0},batched
         assert (batch_output/'skip.mp4').read_bytes()==b'keep existing'
+        cut_input=root/'video cắt theo độ dài';cut_input.mkdir(exist_ok=True)
+        cut_output=root/'cắt hàng loạt';cut_output.mkdir(exist_ok=True)
+        shutil.copy2(source,cut_input/'short.mp4')
+        run([args.ffmpeg.resolve(),'-v','error','-y','-stream_loop','-1','-i',source,'-t','5','-c','copy',cut_input/'long.mp4'])
+        cut_report=root/'cut-fallback.json'
+        run([exe,'--batch-smoke-test',cut_input,'--trim-start','1','--trim-end','4','--output-dir',cut_output,'--report',cut_report],env=restricted,cwd=app_dir)
+        cut=json.loads(cut_report.read_text(encoding='utf-8'))
+        assert cut['ok'] and cut['counts']['completed']==2 and cut['counts']['error']==0,cut
         failure=root/'collision.json'
         original=source.read_bytes()
         process=subprocess.run([str(exe),'--smoke-test',str(source),'--output-dir',str(input_dir),'--report',str(failure)],env=restricted,cwd=app_dir,timeout=30)

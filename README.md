@@ -8,7 +8,7 @@ App desktop Python để chỉnh một video và xuất MP4 mới. **Đã có GU
 - Chọn thư mục xuất; tên mặc định lấy từ tên input.
 - Tốc độ 0.25–4×, audio giữ cao độ; lật ngang/dọc.
 - Âm lượng tiếng gốc và file âm thanh chèn riêng (0–200%); hỗ trợ lặp nhạc hoặc phát một lần.
-- Cắt đoạn từ/tới theo phút:giây hoặc số phút; tốc độ áp dụng sau khi cắt.
+- Cắt đoạn từ/tới theo phút:giây hoặc số phút; video không đủ dài đến mốc tới tự giữ nguyên toàn bộ, tốc độ vẫn áp dụng.
 - Crop bằng kéo góc/cạnh, di chuyển vùng, nhập pixel hoặc preset 9:16 / 16:9 / 1:1.
 - Blur một vùng cố định; kéo để di chuyển/đổi kích thước logo và chữ watermark.
 - Chữ tiếng Việt nhiều dòng trên đầu video, thời gian hiển thị chỉnh được.
@@ -56,7 +56,7 @@ GUI cần màn hình thật hoặc Xvfb. Bản đóng gói dành cho Windows 10/
 
 Preview phát tối đa 960×540/15 fps để giảm tải; xuất giữ độ phân giải đã chọn. Đoạn quá ngắn không chứa frame sẽ báo lỗi và giữ file đích cũ.
 
-**Hàng loạt:** chọn **Chọn thư mục video**, chọn video mẫu từ dropdown và chỉnh như bình thường. Vùng crop/blur/logo/text tự co giãn theo độ phân giải từng file; đổi video mẫu giữ tùy chọn và đổi kích thước vùng tương ứng. Chọn thư mục xuất khác thư mục nguồn, bấm **Xuất hàng loạt**. App xử lý lần lượt video ngay trong thư mục (không quét thư mục con), giữ tên gốc và thêm `_2`, `_3` nếu các input cùng tên stem. File đích đã tồn tại được bỏ qua; file hỏng hoặc không phù hợp mốc cắt được báo lỗi và tiếp tục. **Hủy xuất** dừng file đang chạy và phần còn lại, giữ video đã xong. **Kết quả hàng loạt** xem từng file và đường dẫn báo cáo JSON.
+**Hàng loạt:** chọn **Chọn thư mục video**, chọn video mẫu từ dropdown và chỉnh như bình thường. Vùng crop/blur/logo/text tự co giãn theo độ phân giải từng file; đổi video mẫu giữ tùy chọn và đổi kích thước vùng tương ứng. Chọn thư mục xuất khác thư mục nguồn, bấm **Xuất hàng loạt**. App xử lý lần lượt video ngay trong thư mục (không quét thư mục con), giữ tên gốc và thêm `_2`, `_3` nếu các input cùng tên stem. File đích đã tồn tại được bỏ qua; video không đủ dài để lấy đoạn cắt sẽ giữ nguyên toàn bộ; file hỏng hoặc tùy chọn không hợp lệ được báo lỗi và tiếp tục. **Hủy xuất** dừng file đang chạy và phần còn lại, giữ video đã xong. **Kết quả hàng loạt** xem từng file và đường dẫn báo cáo JSON.
 
 Xuất H.264/AAC MP4, CRF 20, SDR. HDR chưa hỗ trợ. Xuất an toàn hiện yêu cầu filesystem hỗ trợ hardlink (Windows NTFS, Linux ext4); filesystem không hỗ trợ sẽ báo lỗi, giữ file cũ. Nếu ứng dụng khác tạo file đúng tên đích giữa lúc publish, file đó được giữ; có thể có backup file cũ với đường dẫn trong lỗi. Không đồng thời sửa file đích bằng ứng dụng khác.
 

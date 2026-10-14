@@ -73,7 +73,7 @@ def test_bad_file_and_existing_output_do_not_stop_later_jobs(tmp_path,clips):
 
 def test_invalid_options_per_video_continue(tmp_path,clips):
     api=batch_api();source,output=folder(tmp_path,clips)
-    worker=api.BatchWorker();worker.start(api.scan_videos(source),output,EditOptions(trim_start=3,trim_end=5))
+    worker=api.BatchWorker();worker.start(api.scan_videos(source),output,EditOptions(trim_start=5,trim_end=3))
     finish(worker)
     assert [r.status for r in worker.results]==['error','error'] and not list(output.iterdir())
 
@@ -132,3 +132,14 @@ def test_cancel_keeps_completed_output_and_records_unstarted_jobs(tmp_path,clips
     assert probe(output/'a.mp4').duration==pytest.approx(16,abs=.1)
     assert [r.status for r in worker.results]==['completed','cancelled','cancelled']
     assert not (output/'b.mp4').exists() and not (output/'c.mp4').exists()
+
+
+def test_batch_cut_only_videos_long_enough_even_with_short_reference(tmp_path,clips):
+    import subprocess
+    api=batch_api();source,output=folder(tmp_path,clips)
+    subprocess.run(['ffmpeg','-v','error','-y','-stream_loop','-1','-i',str(clips['source']),'-t','8','-c','copy',str(source/'b.MOV')],check=True)
+    worker=api.BatchWorker();worker.start(api.scan_videos(source),output,EditOptions(trim_start=1,trim_end=6,speed=2),reference=probe(source/'a.mp4'),scale=True)
+    finish(worker)
+    assert [r.status for r in worker.results]==['completed','completed']
+    assert probe(output/'a.mp4').duration==pytest.approx(2,abs=.07)
+    assert probe(output/'b.mp4').duration==pytest.approx(2.5,abs=.07)

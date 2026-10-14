@@ -308,3 +308,16 @@ def test_batch_cli_report_cannot_shadow_planned_video(tmp_path,clips):
     target=output/'a.mp4'
     assert main.main(['--batch-smoke-test',str(folder),'--output-dir',str(output),'--report',str(target)])==1
     assert not target.exists()
+
+
+def test_cli_batch_keeps_short_source_and_cuts_long_source(tmp_path,clips):
+    import subprocess,sys,json
+    from app.media import probe
+    folder=tmp_path/'input';folder.mkdir();output=tmp_path/'out';output.mkdir();report=tmp_path/'batch.json'
+    (folder/'a.mp4').write_bytes(clips['source'].read_bytes())
+    subprocess.run(['ffmpeg','-v','error','-y','-stream_loop','-1','-i',str(clips['source']),'-t','8','-c','copy',str(folder/'b.mp4')],check=True)
+    result=subprocess.run([sys.executable,str(ROOT/'main.py'),'--batch-smoke-test',str(folder),'--trim-start','1','--trim-end','6','--output-dir',str(output),'--report',str(report)],capture_output=True,text=True,timeout=40)
+    assert result.returncode==0,result.stderr
+    assert json.loads(report.read_text())['counts']['completed']==2
+    assert probe(output/'a.mp4').duration==pytest.approx(2,abs=.07)
+    assert probe(output/'b.mp4').duration==pytest.approx(2.5,abs=.07)

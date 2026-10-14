@@ -19,7 +19,7 @@ def test_source_time_format(text,seconds):
     assert timing.parse_time(text)==pytest.approx(seconds)
 
 
-@pytest.mark.parametrize('start,end',[(-1,2),(2,2),(3,2),(1,5),(float('nan'),3),(0,float('inf'))])
+@pytest.mark.parametrize('start,end',[(-1,2),(2,2),(3,2),(float('nan'),3),(0,float('inf'))])
 def test_invalid_source_interval_rejected(start,end):
     with pytest.raises(ValueError): validate_options(options(trim_start=start,trim_end=end),320,240,4)
 
@@ -91,3 +91,27 @@ def test_trim_early_audio_selects_correct_content(tmp_path):
 def test_formatted_endpoint_never_exceeds_source(duration):
     from app.timing import format_time,parse_time
     assert 0<=duration-parse_time(format_time(duration))<.0011
+
+
+@pytest.mark.parametrize('duration,start,end,expected',[(4,1,6,(0,4)),(8,1,6,(1,6)),(6,1,6,(1,6)),(4,5,6,(0,4)),(4,5,None,(0,4))])
+def test_short_source_kept_whole_when_requested_cut_does_not_fit(duration,start,end,expected):
+    from app.timing import source_interval,trimmed_duration
+    edit=EditOptions(trim_start=start,trim_end=end,speed=2)
+    validate_options(edit,320,240,duration)
+    assert source_interval(edit,duration)==expected
+    assert trimmed_duration(edit,duration)==(expected[1]-expected[0])/2
+
+
+@pytest.mark.parametrize('preview',[False,True])
+def test_short_source_fallback_keeps_full_video_audio_and_first_frame(clips,tmp_path,preview):
+    from array import array
+    edit=EditOptions(trim_start=2,trim_end=6,speed=2)
+    output=tmp_path/'fallback.mp4';info=probe(clips['source'])
+    prepared=prepare_render(clips['source'],info,edit,output,tmp_path/'assets',preview=preview)
+    subprocess.run(prepared.args,check=True,capture_output=True)
+    assert probe(output).duration==pytest.approx(2,abs=.07) and probe(output).has_audio
+    frame=tmp_path/'fallback.png';render_preview(clips['source'],info,edit,0,frame)
+    with Image.open(frame) as image: assert image.getpixel((10,10))[0]>200
+    raw=subprocess.run(['ffmpeg','-v','error','-i',str(output),'-vn','-ac','1','-ar','48000','-f','f32le','pipe:1'],capture_output=True,check=True).stdout
+    values=array('f');values.frombytes(raw)
+    assert len(values)>=int(1.9*48000) and max(abs(v) for v in values[48000:60000])>.05
